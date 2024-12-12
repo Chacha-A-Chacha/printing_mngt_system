@@ -18,7 +18,6 @@ supplier_bp = Blueprint('supplier', __name__)
 # Reporting routes
 reporting_bp = Blueprint('reporting', __name__)
 
-
 # Import route handlers to register routes
 from . import (
     auth,
