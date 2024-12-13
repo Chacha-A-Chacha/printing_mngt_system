@@ -49,6 +49,11 @@ def get_job_report():
 
 @reporting_bp.route("/jobs/<int:job_id>/usage", methods=["GET"])
 def get_job_usage(job_id):
+    """
+
+    :param job_id:
+    :return:
+    """
 
     usage_details = db.session.query(
         MachineReading.start_meter,
