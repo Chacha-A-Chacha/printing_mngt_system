@@ -38,9 +38,22 @@ class Job(BaseModel):
     client = db.relationship('Client', backref=db.backref('jobs', lazy=True))
     description = db.Column(db.String(255), nullable=True)
     total_profit = db.Column(db.Float, nullable=True)
+    payment_status = db.Column(db.Enum('Paid', 'Partially Paid', 'Unpaid', name='payment_status'), nullable=False,
+                               default='Unpaid')
+    total_amount = db.Column(db.Float, nullable=False)
+    amount_paid = db.Column(db.Float, nullable=False, default=0)
 
-    def __repr__(self):
-        return f"<Job {self.id} for Client {self.client.name}>"
+    def calculate_outstanding_amount(self):
+        return self.total_amount - self.amount_paid
+
+    def update_payment(self, payment_amount):
+        self.amount_paid += payment_amount
+        if self.amount_paid >= self.total_amount:
+            self.payment_status = 'Paid'
+        elif self.amount_paid > 0:
+            self.payment_status = 'Partially Paid'
+        else:
+            self.payment_status = 'Unpaid'
 
 
 class MachineReading(BaseModel):
