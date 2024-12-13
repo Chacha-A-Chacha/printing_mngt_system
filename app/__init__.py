@@ -10,7 +10,7 @@ migrate = Migrate()
 login_manager = LoginManager()
 
 
-def create_app(config_class=Config):
+def create_app(config_class):
     """
     Application factory function to create and configure the Flask application
 

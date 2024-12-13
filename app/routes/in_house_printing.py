@@ -7,6 +7,43 @@ from ..models.client import Client
 from ..services.job_service import MaterialService, MachineUsageService
 
 
+# Route: List all materials
+@in_house_printing_bp.route("/materials", methods=["GET"])
+def list_materials():
+    materials = Material.query.all()
+    return jsonify([material.serialize() for material in materials]), 200
+
+
+# Route: Modify an individual material
+@in_house_printing_bp.route("/materials/<int:material_id>", methods=["PUT"])
+def modify_material(material_id):
+    data = request.json
+    material = Material.query.get(material_id)
+
+    if not material:
+        return jsonify({"error": "Material not found"}), 404
+
+    # Update material attributes if provided
+    if "name" in data:
+        material.name = data["name"]
+    if "type" in data:
+        material.type = data["type"]
+    if "stock_level" in data:
+        material.stock_level = data["stock_level"]
+    if "min_threshold" in data:
+        material.min_threshold = data["min_threshold"]
+    if "cost_per_sq_meter" in data:
+        material.cost_per_sq_meter = data["cost_per_sq_meter"]
+    if "custom_attributes" in data:
+        material.custom_attributes = data["custom_attributes"]
+
+    try:
+        material.save()
+        return jsonify({"message": "Material updated successfully!", "material": material.serialize()}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # Route: Create a new material
 @in_house_printing_bp.route("/materials", methods=["POST"])
 def create_or_update_material():

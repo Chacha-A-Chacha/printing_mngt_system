@@ -7,7 +7,7 @@ from .client import Client
 
 class Material(BaseModel):
     name = db.Column(db.String(100), nullable=False)
-    mt_type = db.Column(db.String(50), nullable=False)
+    type = db.Column(db.String(50), nullable=False)
     stock_level = db.Column(db.Float, nullable=False)
     min_threshold = db.Column(db.Float, nullable=False)
     cost_per_sq_meter = db.Column(db.Float, nullable=False)

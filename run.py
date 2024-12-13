@@ -4,7 +4,8 @@ from flask_migrate import Migrate
 
 
 # Create application instance
-app = create_app()
+config_name = (os.environ.get(''))
+app = create_app('development')
 
 # Initialize Flask-Migrate
 migrate = Migrate(app, db)
