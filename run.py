@@ -2,6 +2,7 @@ import os
 from app import create_app, db
 from flask_migrate import Migrate
 
+
 # Create application instance
 app = create_app()
 
