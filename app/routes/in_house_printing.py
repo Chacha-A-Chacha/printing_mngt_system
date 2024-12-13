@@ -134,3 +134,26 @@ def log_machine_usage(job_id):
         "job_id": job.id,
         "material": material.name
     }), 201
+
+
+@in_house_printing_bp.route("/jobs/<int:job_id>/payment", methods=["POST"])
+def update_payment(job_id):
+    data = request.json
+    payment_amount = data.get("amount")
+
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    try:
+        job.update_payment(payment_amount)
+        job.save()
+        return jsonify({
+            "message": "Payment updated successfully!",
+            "job_id": job.id,
+            "payment_status": job.payment_status,
+            "amount_paid": job.amount_paid,
+            "outstanding_amount": job.calculate_outstanding_amount()
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
