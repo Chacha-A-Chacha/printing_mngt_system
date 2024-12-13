@@ -2,7 +2,8 @@ from flask import jsonify
 
 from . import reporting_bp
 from .. import db
-from ..models.in_house_printing import Material, MachineReading, Client, Job
+from ..models.in_house_printing import Material, MachineReading, Job
+from ..models.client import Client
 
 
 @reporting_bp.route("/reports/material-usage", methods=["GET"])
