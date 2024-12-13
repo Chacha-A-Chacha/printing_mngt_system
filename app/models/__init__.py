@@ -1,3 +1,5 @@
+# models/__init__.py
+
 from .. import db
 from datetime import datetime
 
