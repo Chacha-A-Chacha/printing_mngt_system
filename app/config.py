@@ -1,4 +1,6 @@
 import os
+import logging
+from flask import current_app
 from datetime import timedelta
 
 
@@ -6,6 +8,7 @@ class BaseConfig:
     """
     Base configuration class using environment variables
     """
+
     # Application settings
     APP_NAME = os.environ.get('APP_NAME', 'Printing Management System')
 
@@ -24,7 +27,7 @@ class BaseConfig:
 
     # Logging Configuration
     LOG_TO_STDOUT = os.environ.get('LOG_TO_STDOUT', 'false').lower() in ['true', 'on', '1']
-    LOGGING_LEVEL = os.environ.get('LOGGING_LEVEL', 'INFO')
+    LOGGING_LEVEL = os.environ.get('LOGGING_LEVEL', 'INFO').upper()
 
     # Login Settings
     LOGIN_DISABLED = os.environ.get('LOGIN_DISABLED', 'false').lower() in ['true', 'on', '1']
@@ -35,12 +38,32 @@ class BaseConfig:
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', str(16 * 1024 * 1024)))
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', '/tmp/uploads')
 
+    @classmethod
+    def init_app(cls, app):
+        """
+        Configure logging and other app-specific initialization.
+        :param app: Flask application instance
+        """
+        # Logging Setup
+        if cls.LOG_TO_STDOUT:
+            stream_handler = logging.StreamHandler()
+            stream_handler.setLevel(cls.LOGGING_LEVEL)
+            app.logger.addHandler(stream_handler)
+
+        app.logger.setLevel(cls.LOGGING_LEVEL)
+        app.logger.info(f"{cls.APP_NAME} initialized with {cls.__name__}")
+
+        # Debugging details for loaded configuration
+        app.logger.debug(f"Configuration Loaded: {cls.__name__}")
+        app.logger.debug(f"SESSION_COOKIE_SECURE: {cls.SESSION_COOKIE_SECURE}")
+        app.logger.debug(f"ITEMS_PER_PAGE: {cls.ITEMS_PER_PAGE}")
+        app.logger.debug(f"LOGGING_LEVEL: {cls.LOGGING_LEVEL}")
+
 
 class DatabaseConfig:
     """
     Database configuration with environment variable support
     """
-    # SQLAlchemy Configuration
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_POOL_SIZE = int(os.environ.get('DATABASE_POOL_SIZE', 10))
     SQLALCHEMY_MAX_OVERFLOW = int(os.environ.get('DATABASE_MAX_OVERFLOW', 20))
@@ -60,7 +83,6 @@ class DatabaseConfig:
         # Use environment variable for database URL, with fallback
         db_url = os.environ.get('DATABASE_URL')
 
-        # If no URL is provided, fall back to a default SQLite database
         if not db_url:
             default_db_path = os.path.join(
                 os.path.abspath(os.path.dirname(__file__)),

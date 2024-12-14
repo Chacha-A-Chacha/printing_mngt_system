@@ -3,6 +3,7 @@
 from app import db
 from . import BaseModel
 from .client import Client
+from .supplier import Supplier
 
 
 class Material(BaseModel):
@@ -12,6 +13,7 @@ class Material(BaseModel):
     min_threshold = db.Column(db.Float, nullable=False)
     cost_per_sq_meter = db.Column(db.Float, nullable=False)
     supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'))
+    supplier = db.relationship('Supplier', backref=db.backref('materials', lazy=True))
     custom_attributes = db.Column(db.JSON, nullable=True)
 
     def serialize(self):
@@ -21,7 +23,7 @@ class Material(BaseModel):
         return {
             "id": self.id,
             "name": self.name,
-            "type": self.mt_type,
+            "type": self.type,
             "stock_level": self.stock_level,
             "min_threshold": self.min_threshold,
             "cost_per_sq_meter": self.cost_per_sq_meter,

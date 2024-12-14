@@ -1,10 +1,10 @@
 import os
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from app import create_app, db
 from flask_migrate import Migrate
-
-# Load environment variables from .env file
-load_dotenv()
+#
+# # Load environment variables from .env file
+# load_dotenv()
 
 # Determine configuration based on environment
 config_name = os.environ.get('FLASK_ENV', 'development')
