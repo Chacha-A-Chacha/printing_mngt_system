@@ -157,3 +157,23 @@ def update_payment(job_id):
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@in_house_printing_bp.route("/clients/<int:client_id>/outstanding-payments", methods=["GET"])
+def get_outstanding_payments(client_id):
+    client = Client.query.get(client_id)
+    if not client:
+        return jsonify({"error": "Client not found"}), 404
+
+    outstanding_jobs = [
+        {
+            "job_id": job.id,
+            "description": job.description,
+            "total_amount": job.total_amount,
+            "amount_paid": job.amount_paid,
+            "outstanding_amount": job.calculate_outstanding_amount()
+        }
+        for job in client.jobs if job.payment_status != 'Paid'
+    ]
+
+    return jsonify({"client": client.name, "outstanding_jobs": outstanding_jobs}), 200

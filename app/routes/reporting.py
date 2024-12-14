@@ -69,3 +69,25 @@ def get_job_usage(job_id):
      .all()
     return jsonify(usage_details)
 
+
+@reporting_bp.route("/reports/outstanding-payments", methods=["GET"])
+def outstanding_payment_report():
+    results = db.session.query(
+        Client.name.label("client_name"),
+        Job.id.label("job_id"),
+        Job.description,
+        Job.total_amount,
+        Job.amount_paid,
+        (Job.total_amount - Job.amount_paid).label("outstanding_amount")
+    ).filter(Job.payment_status != 'Paid').join(Client, Client.id == Job.client_id).all()
+
+    report = [{
+        "client_name": r.client_name,
+        "job_id": r.job_id,
+        "description": r.description,
+        "total_amount": r.total_amount,
+        "amount_paid": r.amount_paid,
+        "outstanding_amount": r.outstanding_amount
+    } for r in results]
+
+    return jsonify(report), 200
