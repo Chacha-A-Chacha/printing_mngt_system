@@ -2,6 +2,8 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
+from flask_cors import CORS
+
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -25,6 +27,7 @@ def create_app(config_name):
 
     # Create Flask app instance
     app = Flask(__name__)
+    CORS(app)  # Enable CORS for all routes
 
     # Select and load configuration
     config_class = get_config(config_name)

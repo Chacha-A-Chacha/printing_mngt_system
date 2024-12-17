@@ -14,22 +14,63 @@ def list_materials():
     return jsonify([material.serialize() for material in materials]), 200
 
 
+# Route: Create a new material
+@in_house_printing_bp.route("/new_material", methods=["POST"])
+def create_material():
+    data = request.get_json() or {}
+    name = data.get("name")
+    material_type = data.get("type")
+
+    # Validate required fields
+    if not name or not material_type:
+        return jsonify({"error": "Both 'name' and 'type' are required fields."}), 400
+
+    # Check if a material with the same name and type exists
+    existing_material = Material.query.filter_by(name=name, type=material_type).first()
+    if existing_material:
+        return jsonify({"error": "Material with this name and type already exists."}), 409
+
+    # Create a new Material instance
+    new_material = Material(
+        name=name,
+        type=material_type,
+        stock_level=data.get("stock_level", 0),
+        min_threshold=data.get("min_threshold", 0),  # Adjust or remove if not required
+        cost_per_sq_meter=data.get("cost_per_sq_meter"),
+        custom_attributes=data.get("custom_attributes", {})
+    )
+
+    try:
+        new_material.save()
+        return jsonify({
+            "message": "Material created successfully!",
+            "material_id": new_material.id
+        }), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # Route: Modify an individual material
 @in_house_printing_bp.route("/materials/<int:material_id>", methods=["PUT"])
 def modify_material(material_id):
-    data = request.json
+    data = request.get_json() or {}
+
+    # Fetch the existing material by ID
     material = Material.query.get(material_id)
-
     if not material:
-        return jsonify({"error": "Material not found"}), 404
+        return jsonify({"error": "Material not found."}), 404
 
-    # Update material attributes if provided
+    # Update fields if provided
     if "name" in data:
         material.name = data["name"]
     if "type" in data:
         material.type = data["type"]
     if "stock_level" in data:
-        material.stock_level = data["stock_level"]
+        # Add to existing stock level or set directly?
+        # If we want to replace the stock_level:
+        # material.stock_level = data["stock_level"]
+        # If we want to add to the existing stock level:
+        material.stock_level += data["stock_level"]
     if "min_threshold" in data:
         material.min_threshold = data["min_threshold"]
     if "cost_per_sq_meter" in data:
@@ -39,39 +80,26 @@ def modify_material(material_id):
 
     try:
         material.save()
-        return jsonify({"message": "Material updated successfully!", "material": material.serialize()}), 200
+        return jsonify({
+            "message": "Material updated successfully!",
+            "new_stock_level": material.stock_level
+        }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# Route: Create a new material
-@in_house_printing_bp.route("/materials", methods=["POST"])
-def create_or_update_material():
-    data = request.json
-    material = Material.query.filter_by(name=data.get("name"), type=data.get("type")).first()
+# Route: Delete an individual material
+@in_house_printing_bp.route("/materials/<int:material_id>", methods=["DELETE"])
+def delete_material(material_id):
+    material = Material.query.get(material_id)
+    if not material:
+        return jsonify({"error": "Material not found."}), 404
 
-    if material:
-        # Update existing material's stock level and optional fields
-        material.stock_level += data.get("stock_level", 0)
-        if "cost_per_sq_meter" in data:
-            material.cost_per_sq_meter = data["cost_per_sq_meter"]
-        if "custom_attributes" in data:
-            material.custom_attributes = data["custom_attributes"]
-
-        try:
-            material.save()  # Persist changes
-            return jsonify({"message": "Material updated successfully!", "new_stock_level": material.stock_level}), 200
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    else:
-        # Create a new material
-        try:
-            material = Material(**data)
-            material.save()  # Persist the new material
-            return jsonify({"message": "Material created successfully!", "material_id": material.id}), 201
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+    try:
+        material.delete()
+        return jsonify({"message": "Material deleted successfully!"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # Route: Get all low-stock materials

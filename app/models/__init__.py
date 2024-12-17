@@ -16,17 +16,28 @@ class BaseModel(db.Model):
 
     def save(self):
         """
-        Save the current model instance to the database
+        Save the current model instance to the database.
+        If an exception occurs, rollback the session to maintain session consistency.
         """
-        db.session.add(self)
-        db.session.commit()
+        try:
+            db.session.add(self)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            # Optionally, re-raise the exception or handle it as needed.
+            # For example, you could log the error or return a custom error response.
+            raise e
 
     def delete(self):
         """
         Delete the current model instance from the database
         """
-        db.session.delete(self)
-        db.session.commit()
+        try:
+            db.session.delete(self)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
     @classmethod
     def get_by_id(cls, id):
