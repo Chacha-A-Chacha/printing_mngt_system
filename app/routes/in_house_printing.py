@@ -133,7 +133,7 @@ def list_jobs():
 def create_job():
     """
     Create a new job.
-    :return: 
+    :return:
     """
     data = request.get_json() or {}
     logger.info("job_creation_started", client_id=data.get('client_id'), material_id=data.get('material_id'))
