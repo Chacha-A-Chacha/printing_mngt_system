@@ -1,6 +1,6 @@
 
 from . import BaseModel
-from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, func
+from sqlalchemy import Column, Integer, Float, ForeignKey
 from sqlalchemy.orm import relationship
 
 from .. import db
