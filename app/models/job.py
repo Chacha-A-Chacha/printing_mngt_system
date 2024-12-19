@@ -17,8 +17,6 @@ class Job(BaseModel):
     cancelled_at = Column(DateTime, nullable=True)
     cancellation_reason = Column(Text, nullable=True)
     last_status_change = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     expenses = relationship("JobExpense", backref="job", lazy='dynamic')
     notes = relationship("JobNote", backref="job", lazy='dynamic')
@@ -39,3 +37,10 @@ class Job(BaseModel):
             "cancellation_reason": self.cancellation_reason,
             "last_status_change": self.last_status_change.isoformat() if self.last_status_change else None
         }
+
+
+class JobNote(BaseModel):
+    __tablename__ = 'job_notes'
+
+    job_id = Column(Integer, ForeignKey('jobs.id'), nullable=False)
+    note = Column(Text, nullable=False)
