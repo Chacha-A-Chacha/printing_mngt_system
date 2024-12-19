@@ -44,3 +44,12 @@ class JobNote(BaseModel):
 
     job_id = Column(Integer, ForeignKey('jobs.id'), nullable=False)
     note = Column(Text, nullable=False)
+
+
+class JobMaterialUsage(BaseModel):
+    __tablename__ = 'job_material_usages'
+
+    job_id = Column(Integer, ForeignKey('jobs.id'), nullable=False)
+    material_id = Column(Integer, ForeignKey('materials.id'), nullable=False)
+    usage_meters = Column(Float, nullable=False)
+    cost = Column(Float, nullable=False)
