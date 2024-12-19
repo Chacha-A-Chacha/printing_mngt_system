@@ -1,12 +1,8 @@
 from datetime import datetime
 
+from app.models.in_house_printing import Material
 from app.models.job import Job
-from app.models.material import Material
-from app.models.job_expense import JobExpense
-from app.models.job_note import JobNote
-from app.models.job_material_usage import JobMaterialUsage
-from app.models.job_timeframe_change_log import JobTimeframeChangeLog
-from app.models.machine_reading import MachineReading
+from app.models.machine import MachineReading
 
 
 class MaterialService:
