@@ -2,9 +2,15 @@
 
 from flask import request, jsonify
 from . import in_house_printing_bp
+from .. import logger
 from ..models.in_house_printing import Material, Job, MachineReading
 from ..models.client import Client
-from ..services.job_service import MaterialService, MachineUsageService
+from ..schemas.job_schemas import JobProgressUpdateSchema, JobMaterialUpdateSchema, JobExpenseUpdateSchema, \
+    JobTimeframeUpdateSchema
+from ..services.job_service import MaterialService, MachineUsageService, JobService, JobProgressService, \
+    JobMaterialService, JobExpenseService, JobTimeframeService
+from ..utils.helpers import _determine_update_type
+from ..validation import validate_job_input
 
 
 # Route: List all materials
@@ -51,7 +57,7 @@ def create_material():
 
 
 # Route: Modify an individual material
-@in_house_printing_bp.route("/materials/<int:material_id>", methods=["PUT"])
+@in_house_printing_bp.route("/update_material/<int:material_id>", methods=["PUT"])
 def modify_material(material_id):
     data = request.get_json() or {}
 
@@ -89,7 +95,7 @@ def modify_material(material_id):
 
 
 # Route: Delete an individual material
-@in_house_printing_bp.route("/materials/<int:material_id>", methods=["DELETE"])
+@in_house_printing_bp.route("/delete_material/<int:material_id>", methods=["DELETE"])
 def delete_material(material_id):
     material = Material.query.get(material_id)
     if not material:
@@ -109,18 +115,84 @@ def get_low_stock_materials():
     return jsonify([material.serialize() for material in low_stock_materials]), 200
 
 
-# Route: Create a new job linked to a client
-@in_house_printing_bp.route("/jobs", methods=["POST"])
+@in_house_printing_bp.route("/new_job", methods=["POST"])
 def create_job():
-    data = request.json
-    client_id = data.get("client_id")
-    client = Client.query.get(client_id)
-    if not client:
-        return jsonify({"error": "Client not found"}), 404
+    data = request.get_json() or {}
+    logger.info("job_creation_started", client_id=data.get('client_id'), material_id=data.get('material_id'))
 
-    job = Job(client_id=client_id, description=data.get("description"))
-    job.save()
-    return jsonify({"message": "Job created successfully!", "job_id": job.id}), 201
+    validated_data, errors = validate_job_input(data)
+    if errors:
+        return jsonify({"errors": errors}), 400
+
+    try:
+        job, expenses_recorded = JobService.create_job(validated_data)
+        logger.info("job_creation_completed", job_id=job.id, total_cost=job.total_cost)
+        return jsonify({
+            "message": "Job created successfully!",
+            "job_id": job.id,
+            "total_cost": job.total_cost,
+            "expenses_recorded": expenses_recorded
+        }), 201
+    except ValueError as e:
+        logger.warning("job_creation_failed_validation", error=str(e), client_id=data.get('client_id'))
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error("job_creation_failed_internal", error=str(e), client_id=data.get('client_id'))
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@in_house_printing_bp.route("/update_job/<int:job_id>", methods=["PATCH"])
+def update_job(job_id):
+    """
+    Flexible job update endpoint supporting partial updates.
+    Depending on the payload shape, determine which part of the job to update.
+    """
+    job = Job.query.get_or_404(job_id)
+    data = request.get_json() or {}
+
+    # Determine which type of update this is based on keys in data
+    update_type = _determine_update_type(data)
+
+    if not update_type:
+        return jsonify({"error": "Invalid update payload. Could not determine update type."}), 400
+
+    # Map update types to schemas and services
+    update_schemas = {
+        'progress': JobProgressUpdateSchema(),
+        'material_usage': JobMaterialUpdateSchema(),
+        'expenses': JobExpenseUpdateSchema(),
+        'timeframe': JobTimeframeUpdateSchema(),
+    }
+
+    update_services = {
+        'progress': JobProgressService.update,
+        'material_usage': JobMaterialService.update,
+        'expenses': JobExpenseService.update,
+        'timeframe': JobTimeframeService.update
+    }
+
+    schema = update_schemas.get(update_type)
+    update_service = update_services.get(update_type)
+
+    # Validate input based on update type’s schema
+    from marshmallow import ValidationError
+    try:
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+
+    # Perform the update using the appropriate service
+    try:
+        updated_job = update_service(job, validated_data)
+        return jsonify({
+            "message": "Job updated successfully",
+            "job": updated_job.to_dict()  # Assume Job model has a to_dict() method
+        }), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Job update failed: {str(e)}", extra={"job_id": job_id})
+        return jsonify({"error": "Internal server error"}), 500
 
 
 # Route: Log machine usage and material consumption for a job
