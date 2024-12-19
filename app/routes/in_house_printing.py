@@ -3,8 +3,10 @@
 from flask import request, jsonify
 from . import in_house_printing_bp
 from .. import logger
-from ..models.in_house_printing import Material, Job, MachineReading
+from ..models.in_house_printing import Material
+from ..models.job import Job
 from ..models.client import Client
+from ..models.machine import MachineReading
 from ..schemas.job_schemas import JobProgressUpdateSchema, JobMaterialUpdateSchema, JobExpenseUpdateSchema, \
     JobTimeframeUpdateSchema
 from ..services.job_service import MaterialService, MachineUsageService, JobService, JobProgressService, \
@@ -115,8 +117,24 @@ def get_low_stock_materials():
     return jsonify([material.serialize() for material in low_stock_materials]), 200
 
 
+@in_house_printing_bp.route("/jobs", methods=["GET"])
+def list_jobs():
+    """
+    List all jobs.
+    Supports optional query parameters for filtering or pagination if needed.
+    For now, returns all jobs.
+    """
+    jobs = Job.query.all()
+    job_list = [job.to_dict() for job in jobs]
+    return jsonify(job_list), 200
+
+
 @in_house_printing_bp.route("/new_job", methods=["POST"])
 def create_job():
+    """
+    Create a new job.
+    :return: 
+    """
     data = request.get_json() or {}
     logger.info("job_creation_started", client_id=data.get('client_id'), material_id=data.get('material_id'))
 
@@ -193,6 +211,19 @@ def update_job(job_id):
     except Exception as e:
         logger.error(f"Job update failed: {str(e)}", extra={"job_id": job_id})
         return jsonify({"error": "Internal server error"}), 500
+
+
+@in_house_printing_bp.route("/job/<int:job_id>", methods=["GET"])
+def get_job_detail(job_id):
+    """
+    View a single job's details by ID.
+    Returns 404 if the job is not found.
+    """
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    return jsonify(job.to_dict()), 200
 
 
 # Route: Log machine usage and material consumption for a job
