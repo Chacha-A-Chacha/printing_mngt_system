@@ -53,3 +53,13 @@ class JobMaterialUsage(BaseModel):
     material_id = Column(Integer, ForeignKey('materials.id'), nullable=False)
     usage_meters = Column(Float, nullable=False)
     cost = Column(Float, nullable=False)
+
+
+class JobTimeframeChangeLog(BaseModel):
+    __tablename__ = 'job_timeframe_change_logs'
+
+    job_id = Column(Integer, ForeignKey('jobs.id'), nullable=False)
+    old_start_date = Column(Date, nullable=True)
+    old_end_date = Column(Date, nullable=True)
+    reason = Column(Text, nullable=True)
+    changed_at = Column(DateTime, default=func.now())
