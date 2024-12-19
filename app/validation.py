@@ -1,4 +1,5 @@
-from app.schemas.job_schemas import JobCreateSchema
+from marshmallow import ValidationError
+from .schemas.job_schemas import JobCreateSchema
 
 
 def validate_job_input(data):
@@ -11,5 +12,7 @@ def validate_job_input(data):
 
 
 def validate_material_input(data):
-    schema = MaterialCreateSchema()
+    # Assuming MaterialCreateSchema is defined and imported similarly
+    # schema = MaterialCreateSchema()
+    # Implement as needed
     pass

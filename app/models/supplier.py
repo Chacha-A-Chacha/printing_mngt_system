@@ -3,6 +3,8 @@ from . import BaseModel
 
 
 class Supplier(BaseModel):
+    __tablename__ = 'suppliers'
+
     name = db.Column(db.String(100), nullable=False)
     contact_info = db.Column(db.JSON, nullable=True)
 

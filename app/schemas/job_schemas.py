@@ -14,7 +14,8 @@ class ExpenseSchema(Schema):
 
 
 class JobCreateSchema(Schema):
-    client_id = fields.Integer(required=True, validate=validate.Range(min=1))
+    client_name = fields.String(required=True, validate=validate.Length(min=1))
+    client_phone_number = fields.String(required=True, validate=validate.Length(min=1))
     description = fields.String(required=True, validate=validate.Length(min=1, max=500))
     material_id = fields.Integer(validate=validate.Range(min=1))
     material_usage_meters = fields.Float(validate=validate.Range(min=0))

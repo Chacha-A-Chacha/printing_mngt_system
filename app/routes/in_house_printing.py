@@ -133,14 +133,36 @@ def list_jobs():
 def create_job():
     """
     Create a new job.
-    :return:
+    If client_name and client_phone_number are provided, checks for existing client.
+    If no client exists, creates one and retrieves the new client_id.
+    Then proceeds with job creation.
     """
     data = request.get_json() or {}
-    logger.info("job_creation_started", client_id=data.get('client_id'), material_id=data.get('material_id'))
+    logger.info("job_creation_started", client_name=data.get('client_name'), material_id=data.get('material_id'))
 
+    # Validate input (assumes the schema now expects client_name & client_phone_number instead of client_id)
     validated_data, errors = validate_job_input(data)
     if errors:
         return jsonify({"errors": errors}), 400
+
+    client_name = validated_data.get('client_name')
+    client_phone_number = validated_data.get('client_phone_number')
+
+    if not client_name or not client_phone_number:
+        return jsonify({"error": "Both client_name and client_phone_number are required."}), 400
+
+    # Check if client exists based on phone number
+    existing_client = Client.query.filter_by(phone_number=client_phone_number).first()
+    if existing_client:
+        client_id = existing_client.id
+    else:
+        # Create a new client
+        new_client = Client(name=client_name, phone_number=client_phone_number)
+        new_client.save()
+        client_id = new_client.id
+
+    # Insert the determined client_id into validated_data for job creation
+    validated_data['client_id'] = client_id
 
     try:
         job, expenses_recorded = JobService.create_job(validated_data)

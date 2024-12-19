@@ -1,7 +1,8 @@
-from enum import Enum
+from sqlalchemy import Enum
 
 from app import db
 from . import BaseModel
+from .in_house_printing import Material
 from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import relationship
 
@@ -10,7 +11,7 @@ class Job(BaseModel):
     __tablename__ = 'jobs'
 
     id = Column(Integer, primary_key=True)
-    client_id = Column(Integer, ForeignKey('client.id'), nullable=False)
+    client_id = Column(Integer, ForeignKey('clients.id'), nullable=False)
     client = relationship('Client', backref=db.backref('jobs', lazy=True))
 
     # Job lifecycle fields

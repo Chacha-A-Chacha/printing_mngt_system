@@ -2,15 +2,18 @@
 
 from app import db
 from . import BaseModel
+from .supplier import Supplier
 
 
 class Material(BaseModel):
+    __tablename__ = 'materials'
+
     name = db.Column(db.String(100), nullable=False)
     type = db.Column(db.String(50), nullable=False)
     stock_level = db.Column(db.Float, nullable=False)
     min_threshold = db.Column(db.Float, nullable=False)
     cost_per_sq_meter = db.Column(db.Float, nullable=False)
-    supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'))
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'))
     supplier = db.relationship('Supplier', backref=db.backref('materials', lazy=True))
     custom_attributes = db.Column(db.JSON, nullable=True)
 
