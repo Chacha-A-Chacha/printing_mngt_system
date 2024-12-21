@@ -11,9 +11,13 @@ class TimeframeSchema(Schema):
 
 
 class ExpenseSchema(Schema):
+    """
+    Represents an expense that may be directly associated with a job
+    or shared among multiple jobs.
+    """
     name = fields.String(required=True, validate=validate.Length(min=1, max=200))
     cost = fields.Float(required=True, validate=validate.Range(min=0))
-    shared = fields.Boolean(required=False)
+    shared = fields.Boolean(required=False, missing=False)
     job_ids = fields.List(fields.Integer(), required=False)
 
 
