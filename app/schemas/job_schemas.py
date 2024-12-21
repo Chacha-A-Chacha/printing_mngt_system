@@ -1,7 +1,11 @@
-from marshmallow import Schema, fields, ValidationError, validate
+from marshmallow import Schema, fields, validate
 
 
 class TimeframeSchema(Schema):
+    """
+    Represents optional timeframe data (start/end).
+    This is embedded in some job schemas when a timeframe is relevant.
+    """
     start = fields.Date(required=False)
     end = fields.Date(required=False)
 
