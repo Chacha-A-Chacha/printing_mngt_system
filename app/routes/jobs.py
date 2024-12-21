@@ -216,3 +216,37 @@ def add_job_expenses(job_id):
         allocated_expenses.extend(expense_records)
 
     return jsonify({"message": "Expenses added successfully", "expenses": allocated_expenses}), 200
+
+
+@jobs_bp.route("/jobs/<int:job_id>/progress", methods=["PATCH"])
+def update_job_progress(job_id):
+    """
+    Updates the job’s progress status (pending, in_progress, on_hold, completed, cancelled).
+
+    JSON Payload Example:
+    {
+      "progress_status": "in_progress",
+      "notes": "Started production",
+      "completed_at": null,
+      "reason_for_status_change": null
+    }
+
+    Response:
+      200 OK
+      {
+        "message": "Job progress updated",
+        "job": { ...updated job data... }
+      }
+    """
+    job = Job.query.get_or_404(job_id)
+    data = request.get_json() or {}
+
+    validated_data, errors = validate_progress_input(data)
+    if errors:
+        return jsonify({"errors": errors}), 400
+
+    try:
+        updated_job = JobProgressService.update(job, validated_data)
+        return jsonify({"message": "Job progress updated", "job": updated_job.to_dict()}), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
