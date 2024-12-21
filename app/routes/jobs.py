@@ -105,3 +105,69 @@ def create_job():
         "message": "Job created successfully!",
         "job_id": job.id
     }), 201
+
+
+@jobs_bp.route("/jobs/<int:job_id>/materials", methods=["POST"])
+def add_job_materials(job_id):
+    """
+    Add or update material usage for an in-house job.
+    This endpoint expects a list of materials with usage amounts.
+
+    JSON Payload Example:
+    [
+      {
+        "material_id": 10,
+        "usage_meters": 20.0
+      },
+      {
+        "material_id": 11,
+        "usage_meters": 5.0
+      }
+    ]
+
+    Response:
+      200 OK
+      {
+        "message": "Materials added/updated successfully",
+        "job_id": <job_id>
+      }
+    """
+    job = Job.query.get_or_404(job_id)
+    data = request.get_json() or []
+
+    # Validate list of materials usage
+    validated_materials, errors = validate_material_usage_input(data)
+    if errors:
+        return jsonify({"errors": errors}), 400
+
+    # If the job is outsourced, material usage might be irrelevant or disallowed
+    if job.job_type == 'outsourced':
+        return jsonify({"error": "Cannot add material usage to an outsourced job."}), 400
+
+    for mat_data in validated_materials:
+        material = Material.query.get(mat_data['material_id'])
+        if not material:
+            return jsonify({"error": f"Material {mat_data['material_id']} not found"}), 404
+
+        usage_meters = mat_data['usage_meters']
+        if material.stock_level < usage_meters:
+            return jsonify({"error": "Insufficient stock"}), 400
+
+        # Deduct from stock and update job cost
+        material.stock_level -= usage_meters
+        material.save()
+
+        cost_of_material = (material.cost_per_sq_meter or 0) * usage_meters
+        job.total_cost += cost_of_material
+
+        # Create a usage record
+        usage_record = JobMaterialUsage(
+            job_id=job.id,
+            material_id=material.id,
+            usage_meters=usage_meters,
+            cost=cost_of_material
+        )
+        usage_record.save()
+
+    job.save()
+    return jsonify({"message": "Materials added/updated successfully", "job_id": job.id}), 200
