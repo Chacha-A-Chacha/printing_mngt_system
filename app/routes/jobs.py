@@ -171,3 +171,48 @@ def add_job_materials(job_id):
 
     job.save()
     return jsonify({"message": "Materials added/updated successfully", "job_id": job.id}), 200
+
+
+@jobs_bp.route("/jobs/<int:job_id>/expenses", methods=["POST"])
+def add_job_expenses(job_id):
+    """
+    Adds or updates expenses for a specific job.
+    Supports shared expenses by referencing multiple job_ids if needed.
+
+    JSON Payload Example:
+    [
+      {
+        "name": "Ink cartridges",
+        "cost": 30.0,
+        "shared": false
+      },
+      {
+        "name": "Electricity bill",
+        "cost": 50.0,
+        "shared": true,
+        "job_ids": [124, 125]
+      }
+    ]
+
+    Response:
+      200 OK
+      {
+        "message": "Expenses added successfully",
+        "expenses": [...]
+      }
+    """
+    job = Job.query.get_or_404(job_id)
+    data = request.get_json() or []
+
+    # Validate the list of expenses
+    validated_expenses, errors = validate_expenses_input(data)
+    if errors:
+        return jsonify({"errors": errors}), 400
+
+    allocated_expenses = []
+    for exp_data in validated_expenses:
+        # If using an ExpenseService, or do inline logic:
+        expense_records = ExpenseService.allocate_expense(job, exp_data)
+        allocated_expenses.extend(expense_records)
+
+    return jsonify({"message": "Expenses added successfully", "expenses": allocated_expenses}), 200
