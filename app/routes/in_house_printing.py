@@ -330,3 +330,14 @@ def get_outstanding_payments(client_id):
     ]
 
     return jsonify({"client": client.name, "outstanding_jobs": outstanding_jobs}), 200
+
+
+@in_house_printing_bp.route("/job/payment_statuses", methods=["GET"])
+def get_payment_statuses():
+    """
+    Return the available payment status options for a job.
+    This can be used by the frontend to populate dropdowns or selection controls.
+    """
+    # Since we know the defined Enum values in the model:
+    statuses = ["Paid", "Partially Paid", "Unpaid"]
+    return jsonify({"payment_statuses": statuses}), 200

@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from .. import db
 from ..models.expenses import JobExpense
 from ..models.in_house_printing import Material
 from ..models.job import Job, JobNote, JobMaterialUsage, JobTimeframeChangeLog
@@ -92,11 +93,12 @@ class ExpenseService:
 class JobService:
     @classmethod
     def create_job(cls, data):
-        # Removed db.session.begin() usage, rely on model methods
-        job = cls._create_job_record(data)
-        cls._handle_material_usage(job, data)
-        expenses_recorded = cls._process_expenses(job, data)
-        return job, expenses_recorded
+        # Begin a transaction
+        with db.session.begin():
+            job = cls._create_job_record(data)
+            cls._handle_material_usage(job, data)  # If this fails, transaction rolls back
+            expenses_recorded = cls._process_expenses(job, data)  # If this fails, transaction rolls back
+            return job, expenses_recorded
 
     @classmethod
     def _create_job_record(cls, data):
