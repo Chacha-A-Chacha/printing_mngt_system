@@ -140,11 +140,19 @@ class JobProgressUpdateSchema(Schema):
 
 
 class JobMaterialUpdateSchema(Schema):
+    """
+    Adds or updates materials used in an in-house job after creation.
+    e.g., specifying additional usage or a different material.
+    """
     material_id = fields.Integer(required=True, validate=validate.Range(min=1))
     additional_usage_meters = fields.Float(required=True, validate=validate.Range(min=0.1))
 
 
 class JobExpenseUpdateSchema(Schema):
+    """
+    Adds or updates expenses for a job after creation.
+    This might also allow partial updates to an expense if you store them by ID.
+    """
     expenses = fields.List(fields.Nested({
         'name': fields.String(required=True, validate=validate.Length(min=1)),
         'cost': fields.Float(required=True, validate=validate.Range(min=0)),
@@ -155,6 +163,9 @@ class JobExpenseUpdateSchema(Schema):
 
 
 class JobTimeframeUpdateSchema(Schema):
+    """
+    Updates start_date, end_date, or reason for schedule change.
+    """
     start_date = fields.Date(allow_none=True)
     end_date = fields.Date(allow_none=True)
     reason_for_change = fields.String(allow_none=True, validate=validate.Length(max=500))
