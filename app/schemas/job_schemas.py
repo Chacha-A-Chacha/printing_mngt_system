@@ -120,6 +120,10 @@ class JobCreateSchema(Schema):
 
 
 class JobProgressUpdateSchema(Schema):
+    """
+    Used when partially updating the job's progress status
+    (e.g. from 'pending' to 'in_progress').
+    """
     progress_status = fields.String(
         required=True,
         validate=validate.OneOf([
