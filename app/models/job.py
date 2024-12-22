@@ -4,6 +4,7 @@ from app import db
 from . import BaseModel
 from .in_house_printing import Material  # Adjust import if needed
 
+
 class Job(BaseModel):
     """
     Represents a printing job. This model now supports both:
