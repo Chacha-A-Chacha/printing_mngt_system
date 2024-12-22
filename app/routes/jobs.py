@@ -3,16 +3,13 @@
 
 from flask import request, jsonify
 from . import jobs_bp
-from .. import logger
 from ..models.in_house_printing import Material
 from ..models.job import Job
-from ..models.client import Client
-from ..models.machine import MachineReading
 from ..schemas.job_schemas import JobProgressUpdateSchema, JobMaterialUpdateSchema, JobExpenseUpdateSchema, \
-    JobTimeframeUpdateSchema
-from ..services.job_service import MaterialService, MachineUsageService, JobService, JobProgressService, \
+    JobTimeframeUpdateSchema, JobCreateSchema
+from ..services.job_service_v2 import MaterialService, MachineUsageService, JobService, JobProgressService, \
     JobMaterialService, JobExpenseService, JobTimeframeService
-from ..utils.helpers import _determine_update_type
+from ..services.client_service import find_or_create_client
 from ..validation import validate_job_input
 
 
@@ -21,8 +18,8 @@ def create_job():
     """
     Create a new job with minimal required fields.
     Depending on 'job_type' (in_house/outsourced), certain fields become relevant:
-    - 'in_house': Might later add material usage via /jobs/<job_id>/materials
-    - 'outsourced': Might specify vendor details (via 'vendor_name', 'vendor_cost_per_unit', etc.)
+    - 'in_house': Add material usage via /jobs/<job_id>/materials later.
+    - 'outsourced': Provide vendor details (vendor_name, vendor_cost_per_unit, etc.).
 
     JSON Payload (example):
     {
@@ -56,50 +53,46 @@ def create_job():
     """
     data = request.get_json() or {}
 
-    # Validate base job data (including job_type, client info, description, etc.)
-    validated_data, errors = validate_job_input(data)  # e.g., using JobCreateSchema
-    if errors:
-        return jsonify({"errors": errors}), 400
+    # 1. Validate the incoming data using the JobCreateSchema
+    schema = JobCreateSchema()
+    validated_data = None
+    try:
+        validated_data = schema.load(data)
+    except Exception as e:  # more specifically, marshmallow.ValidationError
+        return jsonify({"errors": str(e)}), 400
 
-    # 1. Find or create the client by phone number
+    # 2. Find or create the client by phone number (via a dedicated client service)
     client = find_or_create_client(
-        validated_data['client_name'],
-        validated_data['client_phone_number']
+        validated_data["client_name"],
+        validated_data["client_phone_number"]
     )
 
-    # 2. Build the Job model, setting in-house/outsourced fields as needed
-    #    For example, if 'job_type' == 'outsourced', we can store vendor_name, etc.
-    job = Job(
-        client_id=client.id,
-        description=validated_data['description'],
-        job_type=validated_data.get('job_type', 'in_house'),
-        vendor_name=validated_data.get('vendor_name'),
-        vendor_cost_per_unit=validated_data.get('vendor_cost_per_unit', 0.0),
-        total_units=validated_data.get('total_units', 0),
-        pricing_per_unit=validated_data.get('pricing_per_unit', 0.0),
-        progress_status=validated_data.get('progress_status', 'pending')
-    )
+    # 3. Construct the creation payload for JobService
+    #    We only store the client_id here, as the JobService expects it.
+    creation_data = {
+        "client_id": client.id,
+        "description": validated_data["description"],
+        "job_type": validated_data.get("job_type", "in_house"),
+        "vendor_name": validated_data.get("vendor_name"),
+        "vendor_cost_per_unit": validated_data.get("vendor_cost_per_unit", 0.0),
+        "total_units": validated_data.get("total_units", 0),
+        "pricing_per_unit": validated_data.get("pricing_per_unit", 0.0),
+        "progress_status": validated_data.get("progress_status", "pending"),
+        "timeframe": validated_data.get("timeframe", {}),
+        "pricing_input": validated_data.get("pricing_input", 0.0),
+        "expenses": validated_data.get("expenses", [])
+    }
 
-    # Optional: If you want to set an initial cost (e.g. pricing_input) at creation
-    initial_pricing = validated_data.get('pricing_input', 0.0)
-    job.total_cost = initial_pricing
-
-    # 3. Handle timeframe if provided
-    timeframe = validated_data.get('timeframe', {})
-    if 'start' in timeframe:
-        job.start_date = timeframe['start']
-    if 'end' in timeframe:
-        job.end_date = timeframe['end']
-
-    # 4. Optionally handle immediate expenses
-    #    You can use an ExpenseService or direct logic to add expenses here
-    expenses = validated_data.get('expenses', [])
-    for exp_data in expenses:
-        # Example: create expense records, update job.total_cost, etc.
-        pass
-
-    # 5. Save the new job
-    job.save()
+    # 4. Use the JobService to create the job (and optionally handle immediate expenses).
+    try:
+        job, expenses_recorded = JobService.create_job(creation_data)
+        # If your JobService doesn't handle expenses, you could call:
+        #   ExpenseService.allocate_expenses(job, validated_data["expenses"])
+        #   job.save()
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
     return jsonify({
         "message": "Job created successfully!",
