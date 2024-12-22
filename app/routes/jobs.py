@@ -5,8 +5,8 @@ from flask import request, jsonify
 from . import jobs_bp
 from ..models.in_house_printing import Material
 from ..models.job import Job
-from ..schemas.job_schemas import JobProgressUpdateSchema, JobMaterialUpdateSchema, JobExpenseUpdateSchema, \
-    JobMaterialSchema, JobCreateSchema, ExpenseSchema
+from ..schemas.job_schemas import JobProgressUpdateSchema, \
+    JobMaterialSchema, JobCreateSchema, ExpenseSchema, JobTimeframeUpdateSchema
 from ..services.job_service_v2 import MaterialService, MachineUsageService, JobService, JobProgressService, \
     JobMaterialService, JobExpenseService, JobTimeframeService, ExpenseService
 from ..services.client_service import find_or_create_client
@@ -219,18 +219,27 @@ def update_job_progress(job_id):
         "job": { ...updated job data... }
       }
     """
-    job = Job.query.get_or_404(job_id)
     data = request.get_json() or {}
 
-    validated_data, errors = validate_progress_input(data)
-    if errors:
-        return jsonify({"errors": errors}), 400
+    # 1. Validate progress fields
+    schema = JobProgressUpdateSchema()
+    try:
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
 
+    # 2. Get job
+    job = Job.query.get_or_404(job_id)
+
+    # 3. Update via JobProgressService
     try:
         updated_job = JobProgressService.update(job, validated_data)
-        return jsonify({"message": "Job progress updated", "job": updated_job.to_dict()}), 200
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+    return jsonify({"message": "Job progress updated", "job": updated_job.to_dict()}), 200
 
 
 @jobs_bp.route("/jobs/<int:job_id>/timeframe", methods=["PATCH"])
@@ -252,34 +261,100 @@ def update_job_timeframe(job_id):
         "job": { ...updated job data... }
       }
     """
-    job = Job.query.get_or_404(job_id)
     data = request.get_json() or {}
+    schema = JobTimeframeUpdateSchema()
 
-    validated_data, errors = validate_timeframe_input(data)
-    if errors:
-        return jsonify({"errors": errors}), 400
+    # 1. Validate timeframe data
+    try:
+        validated_data = schema.load(data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
 
-    updated_job = JobTimeframeService.update(job, validated_data)
+    # 2. Get job
+    job = Job.query.get_or_404(job_id)
+
+    # 3. Delegate to JobTimeframeService
+    try:
+        updated_job = JobTimeframeService.update(job, validated_data)
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
     return jsonify({"message": "Job timeframe updated", "job": updated_job.to_dict()}), 200
 
 
 @jobs_bp.route("/jobs/<int:job_id>", methods=["GET"])
 def get_job_detail(job_id):
     """
-    Fetches the details of a single job, including client info and any relevant fields.
-    JSON Response contains job.to_dict() data.
+    Fetches the details of a single job, including:
+      - Core Job fields (id, description, job_type, etc.)
+      - Associated Client info
+      - Job Expenses
 
-    Response:
-      200 OK
-      {
-        "id": <job_id>,
-        "description": "...",
-        "job_type": "...",
-        ...all other job fields...
-      }
+    JSON Response Example:
+    {
+      "id": 101,
+      "description": "Large banner printing",
+      "job_type": "in_house",
+      "total_cost": 250.0,
+      ... other Job fields ...,
+      "client": {
+        "id": 10,
+        "name": "Jane Doe",
+        "phone_number": "555-1234",
+        ...
+      },
+      "expenses": [
+        {
+          "id": 12,
+          "name": "Ink cartridges",
+          "cost": 30.0
+          ...
+        },
+        ...
+      ]
+    }
     """
     job = Job.query.get(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
 
-    return jsonify(job.to_dict()), 200
+    # Start with the job’s dictionary representation
+    job_data = job.to_dict()
+
+    # 1. Add the Client info, if present.
+    #    Assuming client has a `.to_dict()` method or we build one.
+    if job.client:
+        job_data["client"] = job.client.to_dict()
+        # If no to_dict exists, do something like:
+        # job_data["client"] = {
+        #     "id": job.client.id,
+        #     "name": job.client.name,
+        #     "phone_number": job.client.phone_number,
+        #     ...
+        # }
+    else:
+        job_data["client"] = None
+
+    # 2. Add the Expenses as a list of dicts
+    #    Assuming each expense has a `.to_dict()`.
+    #    If not, we can inline a quick dict representation here.
+    expense_list = []
+    for exp in job.expenses:
+        if hasattr(exp, "to_dict"):
+            expense_list.append(exp.to_dict())
+        else:
+            # Minimal inline representation:
+            expense_list.append({
+                "id": exp.id,
+                "name": exp.name,
+                "cost": exp.cost,
+                "date": exp.date.isoformat() if exp.date else None,
+                "category": exp.category,
+                "receipt_url": exp.receipt_url
+            })
+
+    job_data["expenses"] = expense_list
+
+    return jsonify(job_data), 200
