@@ -250,3 +250,55 @@ def update_job_progress(job_id):
         return jsonify({"message": "Job progress updated", "job": updated_job.to_dict()}), 200
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+
+
+@jobs_bp.route("/jobs/<int:job_id>/timeframe", methods=["PATCH"])
+def update_job_timeframe(job_id):
+    """
+    Updates the start_date/end_date of the job and logs a reason for the change if provided.
+
+    JSON Payload Example:
+    {
+      "start_date": "2024-01-02",
+      "end_date": "2024-01-10",
+      "reason_for_change": "Client requested extension"
+    }
+
+    Response:
+      200 OK
+      {
+        "message": "Job timeframe updated",
+        "job": { ...updated job data... }
+      }
+    """
+    job = Job.query.get_or_404(job_id)
+    data = request.get_json() or {}
+
+    validated_data, errors = validate_timeframe_input(data)
+    if errors:
+        return jsonify({"errors": errors}), 400
+
+    updated_job = JobTimeframeService.update(job, validated_data)
+    return jsonify({"message": "Job timeframe updated", "job": updated_job.to_dict()}), 200
+
+
+@jobs_bp.route("/jobs/<int:job_id>", methods=["GET"])
+def get_job_detail(job_id):
+    """
+    Fetches the details of a single job, including client info and any relevant fields.
+    JSON Response contains job.to_dict() data.
+
+    Response:
+      200 OK
+      {
+        "id": <job_id>,
+        "description": "...",
+        "job_type": "...",
+        ...all other job fields...
+      }
+    """
+    job = Job.query.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    return jsonify(job.to_dict()), 200
