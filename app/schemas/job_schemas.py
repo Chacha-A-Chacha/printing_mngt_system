@@ -1,4 +1,4 @@
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, validate, ValidationError
 
 
 class TimeframeSchema(Schema):
@@ -19,9 +19,6 @@ class ExpenseSchema(Schema):
     cost = fields.Float(required=True, validate=validate.Range(min=0))
     shared = fields.Boolean(required=False, missing=False)
     job_ids = fields.List(fields.Integer(), required=False)
-
-
-from marshmallow import Schema, fields, validate, ValidationError
 
 
 class JobCreateSchema(Schema):
@@ -139,7 +136,7 @@ class JobProgressUpdateSchema(Schema):
     reason_for_status_change = fields.String(allow_none=True, validate=validate.Length(max=500))
 
 
-class JobMaterialUpdateSchema(Schema):
+class JobMaterialSchema(Schema):
     """
     Adds or updates materials used in an in-house job after creation.
     e.g., specifying additional usage or a different material.

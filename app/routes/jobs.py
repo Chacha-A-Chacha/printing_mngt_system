@@ -6,11 +6,11 @@ from . import jobs_bp
 from ..models.in_house_printing import Material
 from ..models.job import Job
 from ..schemas.job_schemas import JobProgressUpdateSchema, JobMaterialUpdateSchema, JobExpenseUpdateSchema, \
-    JobTimeframeUpdateSchema, JobCreateSchema
+    JobMaterialSchema, JobCreateSchema, ExpenseSchema
 from ..services.job_service_v2 import MaterialService, MachineUsageService, JobService, JobProgressService, \
-    JobMaterialService, JobExpenseService, JobTimeframeService
+    JobMaterialService, JobExpenseService, JobTimeframeService, ExpenseService
 from ..services.client_service import find_or_create_client
-from ..validation import validate_job_input
+from marshmallow import ValidationError
 
 
 @jobs_bp.route("/jobs", methods=["POST"])
@@ -104,65 +104,43 @@ def create_job():
 def add_job_materials(job_id):
     """
     Add or update material usage for an in-house job.
-    This endpoint expects a list of materials with usage amounts.
+    Expects a list of material usage objects:
+      [
+        {
+          "material_id": <int>,
+          "usage_meters": <float>
+        },
+        ...
+      ]
 
-    JSON Payload Example:
-    [
-      {
-        "material_id": 10,
-        "usage_meters": 20.0
-      },
-      {
-        "material_id": 11,
-        "usage_meters": 5.0
-      }
-    ]
-
-    Response:
-      200 OK
-      {
-        "message": "Materials added/updated successfully",
-        "job_id": <job_id>
-      }
+    Returns 400 if validation fails or job type is incorrect.
+    Returns 200 with a message and job_id on success.
     """
-    job = Job.query.get_or_404(job_id)
+    # 1. Parse and Validate the incoming JSON array via MaterialUsageSchema
     data = request.get_json() or []
+    schema = JobMaterialSchema(many=True)  # we expect a list of usage records
 
-    # Validate list of materials usage
-    validated_materials, errors = validate_material_usage_input(data)
-    if errors:
-        return jsonify({"errors": errors}), 400
+    try:
+        validated_materials = schema.load(data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
 
-    # If the job is outsourced, material usage might be irrelevant or disallowed
-    if job.job_type == 'outsourced':
-        return jsonify({"error": "Cannot add material usage to an outsourced job."}), 400
+    # 2. Fetch the job
+    job = Job.query.get_or_404(job_id)
 
-    for mat_data in validated_materials:
-        material = Material.query.get(mat_data['material_id'])
-        if not material:
-            return jsonify({"error": f"Material {mat_data['material_id']} not found"}), 404
+    # 3. Delegate logic to the JobMaterialService
+    #    We'll handle each material usage entry in a loop or as a bulk update
+    try:
+        for usage_data in validated_materials:
+            # usage_data = { "material_id": ..., "usage_meters": ... }
+            JobMaterialService.update(job, usage_data)
+    except ValueError as ve:
+        # e.g., "Material not found" or "Insufficient material stock," or "job_type mismatch"
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        # Catch unexpected errors
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
-        usage_meters = mat_data['usage_meters']
-        if material.stock_level < usage_meters:
-            return jsonify({"error": "Insufficient stock"}), 400
-
-        # Deduct from stock and update job cost
-        material.stock_level -= usage_meters
-        material.save()
-
-        cost_of_material = (material.cost_per_sq_meter or 0) * usage_meters
-        job.total_cost += cost_of_material
-
-        # Create a usage record
-        usage_record = JobMaterialUsage(
-            job_id=job.id,
-            material_id=material.id,
-            usage_meters=usage_meters,
-            cost=cost_of_material
-        )
-        usage_record.save()
-
-    job.save()
     return jsonify({"message": "Materials added/updated successfully", "job_id": job.id}), 200
 
 
@@ -194,19 +172,29 @@ def add_job_expenses(job_id):
         "expenses": [...]
       }
     """
-    job = Job.query.get_or_404(job_id)
+    # 1. Load & validate the incoming JSON array using an expense schema
     data = request.get_json() or []
+    schema = ExpenseSchema(many=True)  # expect a list of expense objects
 
-    # Validate the list of expenses
-    validated_expenses, errors = validate_expenses_input(data)
-    if errors:
-        return jsonify({"errors": errors}), 400
+    try:
+        validated_expenses = schema.load(data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
 
+    # 2. Retrieve the main job
+    job = Job.query.get_or_404(job_id)
+
+    # 3. Delegate to the ExpenseService (allocate_expense or allocate_expenses)
     allocated_expenses = []
-    for exp_data in validated_expenses:
-        # If using an ExpenseService, or do inline logic:
-        expense_records = ExpenseService.allocate_expense(job, exp_data)
-        allocated_expenses.extend(expense_records)
+    try:
+        for exp_data in validated_expenses:
+            expense_records = ExpenseService.allocate_expenses(job, exp_data)
+            allocated_expenses.extend(expense_records)
+    except ValueError as ve:
+        # e.g., shared expense references a non-existent job, etc.
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
     return jsonify({"message": "Expenses added successfully", "expenses": allocated_expenses}), 200
 
