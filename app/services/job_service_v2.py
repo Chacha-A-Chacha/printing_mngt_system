@@ -1,13 +1,13 @@
 from datetime import datetime
 
-from .. import db
+from .. import db, logger
 from ..models.expenses import JobExpense
 from ..models.in_house_printing import Material
 from ..models.job import (
     Job,
     JobNote,
     JobMaterialUsage,
-    JobTimeframeChangeLog
+    JobTimeframeChangeLog, JobProgressStatus
 )
 from ..models.machine import MachineReading
 
@@ -91,7 +91,9 @@ class ExpenseService:
         calling _allocate_expense for each item.
         """
         allocated_expenses = []
-        for expense_data in expenses:
+        expense_list = [expenses] if isinstance(expenses, dict) else expenses
+
+        for expense_data in expense_list:
             expense_records = cls._allocate_expense(job, expense_data)
             allocated_expenses.extend(expense_records)
         return allocated_expenses
@@ -152,12 +154,14 @@ class JobService:
         Creates a new job within a transaction.
         Optionally processes expenses if included in the creation payload.
         """
-        with db.session.begin():
+        try:
             job = cls._create_job_record(data)
-            # Removed _handle_material_usage to align with the
-            # new route-based approach for materials.
             expenses_recorded = cls._process_expenses(job, data)
             return job, expenses_recorded
+        except Exception as e:
+            logger.error(f"Error creating job: {e}")
+            db.session.rollback()
+            raise e
 
     @classmethod
     def _create_job_record(cls, data):
@@ -206,35 +210,66 @@ class JobService:
 
 class JobProgressService:
     """
-    Allows partial updates to the job’s progress status.
+    Allows partial updates to the job's progress status.
     For example, from 'pending' to 'in_progress', or 'in_progress' to 'completed'.
     """
 
     @classmethod
-    def update(cls, job, data):
-        previous_status = job.progress_status
-        new_status = data['progress_status']
+    def update(cls, job: Job, data: dict):
+        """
+        Update job progress with validation rules.
 
+        Args:
+            job: Job instance to update
+            data: Validated data dictionary containing update fields
+
+        Returns:
+            Updated Job instance
+
+        Raises:
+            ValueError: If status transition is invalid
+        """
+        previous_status = job.progress_status
+        new_status = JobProgressStatus(data['progress_status'])
+
+        # Define allowed transitions based on JobProgressStatus enum
         allowed_transitions = {
-            "pending": ["in_progress", "cancelled"],
-            "in_progress": ["on_hold", "completed", "cancelled"],
-            "on_hold": ["in_progress", "cancelled"],
-            "completed": ["in_progress"],  # allow reopening if your business logic requires it
-            "cancelled": []
+            JobProgressStatus.PENDING: [
+                JobProgressStatus.IN_PROGRESS,
+                JobProgressStatus.CANCELLED
+            ],
+            JobProgressStatus.IN_PROGRESS: [
+                JobProgressStatus.ON_HOLD,
+                JobProgressStatus.COMPLETED,
+                JobProgressStatus.CANCELLED
+            ],
+            JobProgressStatus.ON_HOLD: [
+                JobProgressStatus.IN_PROGRESS,
+                JobProgressStatus.CANCELLED
+            ],
+            JobProgressStatus.COMPLETED: [
+                JobProgressStatus.IN_PROGRESS  # Allow reopening if business logic requires
+            ],
+            JobProgressStatus.CANCELLED: []  # No transitions allowed from cancelled
         }
 
         if new_status not in allowed_transitions.get(previous_status, []):
-            raise ValueError(f"Invalid status transition from {previous_status} to {new_status}")
+            raise ValueError(
+                f"Invalid status transition from {previous_status.value} to {new_status.value}. "
+                f"Valid transitions are: {[s.value for s in allowed_transitions[previous_status]]}"
+            )
 
         job.progress_status = new_status
         job.last_status_change = datetime.now()
 
-        if new_status == "completed":
+        if new_status == JobProgressStatus.COMPLETED:
             job.completed_at = data.get('completed_at', datetime.now())
             cls._handle_job_completion(job)
-        elif new_status == "cancelled":
+        elif new_status == JobProgressStatus.CANCELLED:
             job.cancelled_at = datetime.now()
             job.cancellation_reason = data.get('reason_for_status_change')
+            if not job.cancellation_reason:
+                raise ValueError("Reason is required when cancelling a job")
 
         if data.get('notes'):
             cls._add_job_note(job, data['notes'])
@@ -243,7 +278,7 @@ class JobProgressService:
         return job
 
     @classmethod
-    def _handle_job_completion(cls, job):
+    def _handle_job_completion(cls, job: Job):
         """
         Additional completion logic could go here,
         e.g., finalize billing or send completion notifications.
@@ -251,7 +286,7 @@ class JobProgressService:
         pass
 
     @classmethod
-    def _add_job_note(cls, job, note):
+    def _add_job_note(cls, job: Job, note: str):
         """
         Records a note about the status update
         (e.g., reason for on_hold, or message upon completion).
@@ -265,8 +300,10 @@ class JobProgressService:
 
 class JobMaterialService:
     """
+
     Updates job material usage for in-house jobs.
     Typically invoked by /jobs/<job_id>/materials route.
+
     """
 
     @classmethod
@@ -274,11 +311,11 @@ class JobMaterialService:
         """
         data = {
           'material_id': <int>,
-          'additional_usage_meters': <float>
+          'usage_meters': <float>
         }
         """
         material_id = data['material_id']
-        additional_usage = data['additional_usage_meters']
+        additional_usage = data['usage_meters']
 
         # Check if job_type is 'in_house'; if outsourced, might raise an error or do nothing.
         if job.job_type == 'outsourced':

@@ -142,7 +142,7 @@ class JobMaterialSchema(Schema):
     e.g., specifying additional usage or a different material.
     """
     material_id = fields.Integer(required=True, validate=validate.Range(min=1))
-    additional_usage_meters = fields.Float(required=True, validate=validate.Range(min=0.1))
+    usage_meters = fields.Float(required=True, validate=validate.Range(min=0.1))
 
 
 class JobExpenseUpdateSchema(Schema):

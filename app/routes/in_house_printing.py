@@ -7,7 +7,7 @@ from ..models.in_house_printing import Material
 from ..models.job import Job
 from ..models.client import Client
 from ..models.machine import MachineReading
-from ..schemas.job_schemas import JobProgressUpdateSchema, JobMaterialUpdateSchema, JobExpenseUpdateSchema, \
+from ..schemas.job_schemas import JobProgressUpdateSchema, JobExpenseUpdateSchema, \
     JobTimeframeUpdateSchema
 from ..services.job_service import MaterialService, MachineUsageService, JobService, JobProgressService, \
     JobMaterialService, JobExpenseService, JobTimeframeService

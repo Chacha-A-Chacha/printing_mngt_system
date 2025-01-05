@@ -1,8 +1,21 @@
+import enum
+
 from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, func, Enum
 from sqlalchemy.orm import relationship
 from app import db
 from . import BaseModel
 from .in_house_printing import Material  # Adjust import if needed
+
+
+class JobProgressStatus(enum.Enum):
+    """
+    Enum representing possible job progress statuses.
+    """
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    ON_HOLD = "on_hold"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
 
 class Job(BaseModel):
@@ -36,7 +49,12 @@ class Job(BaseModel):
 
     # Job Lifecycle Fields
     description = Column(Text, nullable=False, doc="A short description of the job.")
-    progress_status = Column(String(50), default="pending", doc="Job progress status (e.g., 'pending', 'in_progress').")
+    progress_status = Column(
+        Enum(JobProgressStatus),
+        nullable=False,
+        default=JobProgressStatus.PENDING,
+        doc="Job progress status (e.g., 'pending', 'in_progress')."
+    )
     start_date = Column(Date, nullable=True, doc="Scheduled start date for the job.")
     end_date = Column(Date, nullable=True, doc="Scheduled end date for the job.")
     completed_at = Column(DateTime, nullable=True, doc="Timestamp when the job was fully completed.")
@@ -121,7 +139,7 @@ class Job(BaseModel):
             "vendor_cost_per_unit": self.vendor_cost_per_unit,
             "total_units": self.total_units,
             "pricing_per_unit": self.pricing_per_unit,
-            "progress_status": self.progress_status,
+            "progress_status": self.progress_status.value,
             "total_cost": self.total_cost,
             "total_amount": self.total_amount,
             "amount_paid": self.amount_paid,
@@ -160,6 +178,21 @@ class JobMaterialUsage(BaseModel):
     material_id = Column(Integer, ForeignKey('materials.id'), nullable=False)
     usage_meters = Column(Float, nullable=False, doc="Number of meters used, if relevant for in-house materials.")
     cost = Column(Float, nullable=False, doc="Calculated cost from usage_meters * cost_per_sq_meter or similar.")
+
+    material = relationship("Material", backref="job_material_usages")
+
+    def to_dict(self):
+        """
+
+        :return: A dictionary representation of this usage record
+        """
+        return {
+            "id": self.id,
+            "material_id": self.material_id,
+            "material_name": self.material.name if self.material else None,
+            "usage_meters": self.usage_meters,
+            "cost": self.cost
+        }
 
 
 class JobTimeframeChangeLog(BaseModel):

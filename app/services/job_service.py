@@ -94,12 +94,15 @@ class JobService:
     @classmethod
     def create_job(cls, data):
         # Begin a transaction
-        with db.session.begin():
+        try:
             job = cls._create_job_record(data)
             cls._handle_material_usage(job, data)  # If this fails, transaction rolls back
             expenses_recorded = cls._process_expenses(job, data)  # If this fails, transaction rolls back
             return job, expenses_recorded
-
+        except Exception as e:
+            db.session.rollback()
+            raise e
+        
     @classmethod
     def _create_job_record(cls, data):
         job = Job(

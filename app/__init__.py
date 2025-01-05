@@ -86,7 +86,7 @@ def _register_blueprints(app):
         (in_house_printing_bp, '/in-house'),
         (outsourced_production_bp, '/production'),
         (client_bp, '/clients'),
-        (jobs_bp, '/jobs'),
+        (jobs_bp, '/print'),
         (supplier_bp, '/suppliers'),
         (reporting_bp, '/reports')
     ]
