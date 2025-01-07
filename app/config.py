@@ -32,7 +32,7 @@ class BaseConfig:
     # Login Settings
     LOGIN_DISABLED = os.environ.get('LOGIN_DISABLED', 'false').lower() in ['true', 'on', '1']
     MAX_LOGIN_ATTEMPTS = int(os.environ.get('MAX_LOGIN_ATTEMPTS', 5))
-    LOGIN_LOCKOUT_DURATION = int(os.environ.get('LOGIN_LOCKOUT_DURATION', 15))
+    # LOGIN_LOCKOUT_DURATION = int(os.environ.get('LOGIN_LOCKOUT_DURATION', 15))
 
     # File Upload Settings
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', str(16 * 1024 * 1024)))
@@ -82,6 +82,7 @@ class DatabaseConfig:
 
         # Use environment variable for database URL, with fallback
         db_url = os.environ.get('DATABASE_URL')
+        print("DEBUG: DATABASE_URL =", db_url)
 
         if not db_url:
             default_db_path = os.path.join(
