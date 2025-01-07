@@ -16,6 +16,9 @@ print("DEBUG: DATABASE_URL =", db_url)
 # Create application instance
 app = create_app(config_name)
 
+# This is the application object that Passenger uses
+application = app
+
 # Initialize Flask-Migrate
 migrate = Migrate(app, db)
 

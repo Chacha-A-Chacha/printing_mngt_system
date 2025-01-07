@@ -6,7 +6,7 @@ from flask import request, jsonify
 from . import jobs_bp
 from app import logger
 from ..models.in_house_printing import Material
-from ..models.job import Job
+from ..models.job import Job, JobProgressStatus
 from ..schemas.job_schemas import JobProgressUpdateSchema, \
     JobMaterialSchema, JobCreateSchema, ExpenseSchema, JobTimeframeUpdateSchema
 from ..services.job_service_v2 import MaterialService, MachineUsageService, JobService, JobProgressService, \
@@ -479,11 +479,32 @@ def list_jobs_summary():
     if job_type and job_type != 'all':
         filters.append(Job.job_type == job_type)
     if progress_status and progress_status != 'all':
-        filters.append(Job.progress_status == progress_status)
+        # Convert string status to enum for comparison
+        try:
+            enum_status = JobProgressStatus(progress_status)
+            filters.append(Job.progress_status == enum_status)
+        except ValueError:
+            return jsonify({
+                "error": f"Invalid progress status: {progress_status}"
+            }), 400
+
     if start_date:
-        filters.append(Job.created_at >= datetime.fromisoformat(start_date))
+        try:
+            start_datetime = datetime.fromisoformat(start_date)
+            filters.append(Job.created_at >= start_datetime)
+        except ValueError:
+            return jsonify({
+                "error": "Invalid start date format. Use ISO format (YYYY-MM-DD)"
+            }), 400
+
     if end_date:
-        filters.append(Job.created_at <= datetime.fromisoformat(end_date))
+        try:
+            end_datetime = datetime.fromisoformat(end_date)
+            filters.append(Job.created_at <= end_datetime)
+        except ValueError:
+            return jsonify({
+                "error": "Invalid end date format. Use ISO format (YYYY-MM-DD)"
+            }), 400
 
     if filters:
         query = query.filter(and_(*filters))
@@ -502,7 +523,7 @@ def list_jobs_summary():
         job_list.append({
             "id": job.id,
             "client_name": client_name,
-            "progress_status": job.progress_status,
+            "progress_status": job.progress_status.value if job.progress_status else None,  # Get enum value
             "job_type": job.job_type,
             "created_at": job.created_at.isoformat() if job.created_at else None,
             "payment_status": job.payment_status
