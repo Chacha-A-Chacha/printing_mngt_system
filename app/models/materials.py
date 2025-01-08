@@ -65,3 +65,20 @@ class MaterialUsage(BaseModel):
     # user = db.relationship('User', backref='material_usages')
 
 
+class StockTransaction(BaseModel):
+    __tablename__ = 'stock_transactions'
+
+    TRANSACTION_TYPES = ['RESTOCK', 'ADJUSTMENT', 'RETURN']
+
+    material_id = db.Column(db.Integer, db.ForeignKey('materials.id'), nullable=False)
+    transaction_type = db.Column(db.String(20), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    previous_stock = db.Column(db.Float, nullable=False)
+    new_stock = db.Column(db.Float, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    reference_number = db.Column(db.String(50))  # PO number or adjustment reference
+    notes = db.Column(db.String(255))
+
+    # Relationships
+    material = db.relationship('Material', backref='stock_transactions')
+    # user = db.relationship('User', backref='stock_transactions')

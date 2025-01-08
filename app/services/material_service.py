@@ -152,3 +152,113 @@ class MaterialService:
             query = query.filter(MaterialUsage.usage_date <= end_date)
 
         return query.order_by(MaterialUsage.usage_date.desc()).all()
+
+
+    @staticmethod
+    def restock_material(data: dict) -> StockTransaction:
+        """
+        Handle material restocking from supplier deliveries
+
+        Args:
+            data: {
+                'material_id': int,
+                'quantity': float,
+                'user_id': int,
+                'reference_number': str,  # PO number
+                'notes': str
+            }
+        """
+        try:
+            with db.session.begin():
+                material = Material.query.get(data['material_id'])
+                if not material:
+                    raise ValueError("Material not found")
+
+                quantity = float(data['quantity'])
+                if quantity <= 0:
+                    raise ValueError("Restock quantity must be positive")
+
+                previous_stock = material.stock_level
+                material.stock_level += quantity
+
+                transaction = StockTransaction(
+                    material_id=material.id,
+                    transaction_type='RESTOCK',
+                    quantity=quantity,
+                    previous_stock=previous_stock,
+                    new_stock=material.stock_level,
+                    user_id=data['user_id'],
+                    reference_number=data.get('reference_number'),
+                    notes=data.get('notes', '')
+                )
+
+                db.session.add(transaction)
+                db.session.commit()
+
+                return transaction
+
+
+    @staticmethod
+    def adjust_stock(data: dict) -> StockTransaction:
+    """
+    Handle stock adjustments (e.g., after inventory count)
+
+    Args:
+        data: {
+            'material_id': int,
+            'new_stock_level': float,
+            'user_id': int,
+            'reference_number': str,
+            'notes': str  # Reason for adjustment
+        }
+    """
+    try:
+        with db.session.begin():
+            material = Material.query.get(data['material_id'])
+            if not material:
+                raise ValueError("Material not found")
+
+            new_stock = float(data['new_stock_level'])
+            if new_stock < 0:
+                raise ValueError("Stock level cannot be negative")
+
+            previous_stock = material.stock_level
+            quantity_difference = new_stock - previous_stock
+
+            transaction = StockTransaction(
+                material_id=material.id,
+                transaction_type='ADJUSTMENT',
+                quantity=quantity_difference,
+                previous_stock=previous_stock,
+                new_stock=new_stock,
+                user_id=data['user_id'],
+                reference_number=data.get('reference_number'),
+                notes=data.get('notes', '')
+            )
+
+            material.stock_level = new_stock
+
+            db.session.add(transaction)
+            db.session.commit()
+
+            return transaction
+
+
+        @staticmethod
+        def get_stock_transactions(
+                material_id: int,
+                transaction_type: Optional[str] = None,
+                start_date: Optional[datetime] = None,
+                end_date: Optional[datetime] = None
+        ) -> List[StockTransaction]:
+            """Get stock transaction history with filters"""
+            query = StockTransaction.query.filter_by(material_id=material_id)
+
+            if transaction_type:
+                query = query.filter_by(transaction_type=transaction_type)
+            if start_date:
+                query = query.filter(StockTransaction.created_at >= start_date)
+            if end_date:
+                query = query.filter(StockTransaction.created_at <= end_date)
+
+            return query.order_by(StockTransaction.created_at.desc()).all()
