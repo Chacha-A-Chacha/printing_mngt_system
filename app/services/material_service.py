@@ -3,7 +3,7 @@ from typing import List, Dict, Optional
 from sqlalchemy.exc import IntegrityError
 
 from app import db
-from app.models.materials import Material, MaterialUsage
+from app.models.materials import Material, MaterialUsage, StockTransaction
 
 
 class MaterialService:
