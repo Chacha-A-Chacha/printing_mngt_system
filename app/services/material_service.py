@@ -70,6 +70,36 @@ class MaterialService:
         ).all()
 
     @staticmethod
+    def get_material_by_code(material_code: str) -> Optional[Material]:
+        """Get material by unique code"""
+        return Material.query.filter_by(material_code=material_code).first()
+
+    @staticmethod
+    def search_materials(
+            search_term: str,
+            category: Optional[str] = None,
+            supplier_id: Optional[int] = None
+    ) -> List[Material]:
+        """Search materials by name or code"""
+        query = Material.query
+
+        if search_term:
+            search = f"%{search_term}%"
+            query = query.filter(
+                db.or_(
+                    Material.name.ilike(search),
+                    Material.material_code.ilike(search)
+                )
+            )
+
+        if category:
+            query = query.filter_by(category=category)
+        if supplier_id:
+            query = query.filter_by(supplier_id=supplier_id)
+
+        return query.all()
+
+    @staticmethod
     def record_material_usage(data: dict) -> MaterialUsage:
         """Records material usage"""
         # Fetch material
@@ -116,7 +146,7 @@ class MaterialService:
             material_id: int,
             start_date: Optional[datetime] = None,
             end_date: Optional[datetime] = None
-        ) -> List[MaterialUsage]:
+    ) -> List[MaterialUsage]:
         """Get usage history for a specific material"""
         query = MaterialUsage.query.filter_by(material_id=material_id)
 
@@ -220,7 +250,7 @@ class MaterialService:
             transaction_type: Optional[str] = None,
             start_date: Optional[datetime] = None,
             end_date: Optional[datetime] = None
-        ) -> List[StockTransaction]:
+    ) -> List[StockTransaction]:
         """Get stock transaction history with filters"""
         query = StockTransaction.query.filter_by(material_id=material_id)
 

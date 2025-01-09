@@ -5,7 +5,7 @@ from sqlalchemy import and_
 from flask import request, jsonify
 from . import jobs_bp
 from app import logger
-from ..models.in_house_printing import Material
+from ..models.materials import Material
 from ..models.job import Job, JobProgressStatus
 from ..schemas.job_schemas import JobProgressUpdateSchema, \
     JobMaterialSchema, JobCreateSchema, ExpenseSchema, JobTimeframeUpdateSchema

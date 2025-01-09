@@ -2,7 +2,7 @@ from flask import jsonify
 
 from . import reporting_bp
 from .. import db
-from ..models.in_house_printing import Material
+from ..models.materials import Material
 from ..models.client import Client
 from ..models.job import Job
 from ..models.machine import MachineReading
