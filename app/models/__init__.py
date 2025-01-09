@@ -1,4 +1,5 @@
 # models/__init__.py
+from typing import List
 
 from .. import db
 from datetime import datetime
@@ -13,6 +14,17 @@ class BaseModel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    @staticmethod
+    def atomic_transaction(operations: List[callable]):
+        """Execute multiple operations in a single transaction"""
+        try:
+            with db.session.begin():
+                for operation in operations:
+                    operation()
+        except Exception as e:
+            db.session.rollback()
+            raise e
 
     def save(self):
         """

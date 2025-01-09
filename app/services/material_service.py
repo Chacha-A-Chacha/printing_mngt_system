@@ -153,7 +153,6 @@ class MaterialService:
 
         return query.order_by(MaterialUsage.usage_date.desc()).all()
 
-
     @staticmethod
     def restock_material(data: dict) -> StockTransaction:
         """
