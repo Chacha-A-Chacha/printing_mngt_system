@@ -75,6 +75,21 @@ class MaterialUsage(BaseModel):
     job = db.relationship('Job', backref='material_usages')
     # user = db.relationship('User', backref='material_usages')
 
+    def serialize(self):
+        return {
+            "id": self.id,
+            "material_id": self.material_id,
+            "job_id": self.job_id,
+            "quantity_used": self.quantity_used,
+            "unit_of_measure": self.unit_of_measure,
+            "wastage": self.wastage,
+            "notes": self.notes,
+            "user_id": self.user_id,
+            "usage_date": self.usage_date.isoformat(),
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat()
+        }
+
 
 class StockTransaction(BaseModel):
     __tablename__ = 'stock_transactions'
@@ -93,3 +108,18 @@ class StockTransaction(BaseModel):
     # Relationships
     material = db.relationship('Material', backref='stock_transactions')
     # user = db.relationship('User', backref='stock_transactions')
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "material_id": self.material_id,
+            "transaction_type": self.transaction_type,
+            "quantity": self.quantity,
+            "previous_stock": self.previous_stock,
+            "new_stock": self.new_stock,
+            "reference_number": self.reference_number,
+            "notes": self.notes,
+            "user_id": self.user_id,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat()
+        }
