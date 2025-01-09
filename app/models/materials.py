@@ -23,13 +23,14 @@ class Material(BaseModel):
 
     # Specifications
     specifications = db.Column(db.JSON, nullable=True)  # For dimensions, weight, etc.
+    custom_attributes = db.Column(db.JSON, nullable=True)
 
     # Supplier Relationship
     supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
     supplier = db.relationship('Supplier', backref=db.backref('materials', lazy=True))
 
     def serialize(self):
-        return {
+        base_data = {
             "id": self.id,
             "material_code": self.material_code,
             "name": self.name,
@@ -42,9 +43,19 @@ class Material(BaseModel):
             "cost_per_unit": self.cost_per_unit,
             "specifications": self.specifications,
             "supplier_id": self.supplier_id,
+            "custom_attributes": self.custom_attributes,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat()
         }
+
+        # Add relationships if loaded
+        if self.supplier:
+            base_data["supplier"] = {
+                "id": self.supplier.id,
+                "name": self.supplier.name
+            }
+
+        return base_data
 
 
 class MaterialUsage(BaseModel):

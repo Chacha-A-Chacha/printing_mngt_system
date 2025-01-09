@@ -220,7 +220,7 @@ class MaterialService:
             transaction_type: Optional[str] = None,
             start_date: Optional[datetime] = None,
             end_date: Optional[datetime] = None
-    ) -> List[StockTransaction]:
+        ) -> List[StockTransaction]:
         """Get stock transaction history with filters"""
         query = StockTransaction.query.filter_by(material_id=material_id)
 
