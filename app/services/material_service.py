@@ -45,7 +45,6 @@ class MaterialService:
             material.save()
             return material
         except IntegrityError:
-            db.session.rollback()
             raise ValueError("Material code must be unique")
 
     @staticmethod
@@ -72,77 +71,52 @@ class MaterialService:
 
     @staticmethod
     def record_material_usage(data: dict) -> MaterialUsage:
-        """
-        Records material usage with proper validation and stock management.
+        """Records material usage"""
+        # Fetch material
+        material = Material.query.get(data['material_id'])
+        if not material:
+            raise ValueError("Material not found")
 
-        Args:
-            data: {
-                'material_id': int,
-                'job_id': int,
-                'quantity_used': float,
-                'user_id': int,
-                'wastage': float,
-                'notes': str
-            }
-        """
-        try:
-            # Start database transaction
-            with db.session.begin():
-                # Fetch material
-                material = Material.query.get(data['material_id'])
-                if not material:
-                    raise ValueError("Material not found")
+        quantity = float(data['quantity_used'])
+        wastage = float(data.get('wastage', 0.0))
+        total_deduction = quantity + wastage
 
-                quantity = float(data['quantity_used'])
-                wastage = float(data.get('wastage', 0.0))
-                total_deduction = quantity + wastage
+        # Validate quantities
+        if quantity <= 0:
+            raise ValueError("Usage quantity must be positive")
+        if wastage < 0:
+            raise ValueError("Wastage cannot be negative")
 
-                # Validate quantities
-                if quantity <= 0:
-                    raise ValueError("Usage quantity must be positive")
-                if wastage < 0:
-                    raise ValueError("Wastage cannot be negative")
+        # Check stock availability
+        if material.stock_level < total_deduction:
+            raise ValueError(f"Insufficient stock. Available: {material.stock_level}, Required: {total_deduction}")
 
-                # Check stock availability
-                if material.stock_level < total_deduction:
-                    raise ValueError(
-                        f"Insufficient stock. Available: {material.stock_level}, Required: {total_deduction}")
+        # Create usage record
+        usage = MaterialUsage(
+            material_id=material.id,
+            job_id=data['job_id'],
+            quantity_used=quantity,
+            unit_of_measure=material.unit_of_measure,
+            user_id=data['user_id'],
+            wastage=wastage,
+            notes=data.get('notes', '')
+        )
 
-                # Create usage record
-                usage = MaterialUsage(
-                    material_id=material.id,
-                    job_id=data['job_id'],
-                    quantity_used=quantity,
-                    unit_of_measure=material.unit_of_measure,
-                    user_id=data['user_id'],
-                    wastage=wastage,
-                    notes=data.get('notes', '')
-                )
+        # Update stock level
+        material.stock_level -= total_deduction
 
-                # Update stock level
-                material.stock_level -= total_deduction
+        # Save both changes using the model's save method
+        material.save()  # This handles its own transaction
+        usage.save()  # This handles its own transaction
 
-                # Check if stock level is below threshold after deduction
-                if material.stock_level <= material.min_threshold:
-                    # You might want to trigger notifications here
-                    pass
-
-                # Save both records
-                db.session.add(usage)
-                db.session.commit()
-
-                return usage
-
-        except Exception as e:
-            db.session.rollback()
-            raise
+        return usage
 
     @staticmethod
     def get_material_usage_history(
             material_id: int,
             start_date: Optional[datetime] = None,
             end_date: Optional[datetime] = None
-    ) -> List[MaterialUsage]:
+        ) -> List[MaterialUsage]:
         """Get usage history for a specific material"""
         query = MaterialUsage.query.filter_by(material_id=material_id)
 
@@ -167,34 +141,34 @@ class MaterialService:
                 'notes': str
             }
         """
-        try:
-            with db.session.begin():
-                material = Material.query.get(data['material_id'])
-                if not material:
-                    raise ValueError("Material not found")
+        material = Material.query.get(data['material_id'])
 
-                quantity = float(data['quantity'])
-                if quantity <= 0:
-                    raise ValueError("Restock quantity must be positive")
+        if not material:
+            raise ValueError("Material not found")
 
-                previous_stock = material.stock_level
-                material.stock_level += quantity
+        quantity = float(data['quantity'])
+        if quantity <= 0:
+            raise ValueError("Restock quantity must be positive")
 
-                transaction = StockTransaction(
-                    material_id=material.id,
-                    transaction_type='RESTOCK',
-                    quantity=quantity,
-                    previous_stock=previous_stock,
-                    new_stock=material.stock_level,
-                    user_id=data['user_id'],
-                    reference_number=data.get('reference_number'),
-                    notes=data.get('notes', '')
-                )
+        previous_stock = material.stock_level
+        material.stock_level += quantity
 
-                db.session.add(transaction)
-                db.session.commit()
+        transaction = StockTransaction(
+            material_id=material.id,
+            transaction_type='RESTOCK',
+            quantity=quantity,
+            previous_stock=previous_stock,
+            new_stock=material.stock_level,
+            user_id=data['user_id'],
+            reference_number=data.get('reference_number'),
+            notes=data.get('notes', '')
+        )
 
-                return transaction
+        # Use model's save methods
+        material.save()
+        transaction.save()
+
+        return transaction
 
 
     @staticmethod
