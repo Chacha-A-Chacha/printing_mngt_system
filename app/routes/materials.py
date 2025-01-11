@@ -29,6 +29,59 @@ def create_material():
             description: Validation error
           500:
             description: Internal server error
+            
+            // POST /materials/create
+            // Request
+            {
+                "material_code": "VNL-001",
+                "name": "Premium Vinyl",
+                "category": "Vinyl",
+                "type": "Adhesive",
+                "unit_of_measure": "meters",
+                "min_threshold": 100.0,
+                "reorder_quantity": 500.0,
+                "cost_per_unit": 15.5,
+                "supplier": {
+                    "name": "Premium Vinyl Supplier",
+                    "phone_number": "254712345678",
+                    "contact_info": {
+                        "email": "contact@premiumvinyl.com"
+                    }
+                },
+                "specifications": {
+                    "width": 1.52,
+                    "thickness": 0.08
+                }
+            }
+            
+            // Response 201
+            {
+                "message": "Material created successfully",
+                "material": {
+                    "material_code": "VNL-001",
+                    "name": "Premium Vinyl",
+                    "category": "Vinyl",
+                    "type": "Adhesive",
+                    "unit_of_measure": "meters",
+                    "stock_level": 0.0,
+                    "min_threshold": 100.0,
+                    "reorder_quantity": 500.0,
+                    "cost_per_unit": 15.5,
+                    "specifications": {
+                        "width": 1.52,
+                        "thickness": 0.08
+                    },
+                    "supplier": {
+                        "name": "Premium Vinyl Supplier",
+                        "phone_number": "254712345678",
+                        "contact_info": {
+                            "email": "contact@premiumvinyl.com"
+                        }
+                    },
+                    "created_at": "2025-01-11T15:30:00",
+                    "updated_at": "2025-01-11T15:30:00"
+                }
+            }
         """
     schema = MaterialCreateSchema()
 

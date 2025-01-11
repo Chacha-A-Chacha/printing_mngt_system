@@ -12,52 +12,95 @@ from sqlalchemy.exc import IntegrityError
 
 from app import db, logger
 from app.models.materials import Material, MaterialUsage, StockTransaction
+from app.services.supplier_service import SupplierService
 
 
 class MaterialService:
     @staticmethod
     def create_material(data: Dict) -> Material:
-        """Create a new material with validation"""
+        """
+        Create a new material with validation.
+        Automatically creates supplier if it doesn't exist.
+
+        Args:
+            data: {
+                'material_code': str,
+                'name': str,
+                'category': str,
+                'type': str,
+                'unit_of_measure': str,
+                'min_threshold': float,
+                'reorder_quantity': float,
+                'cost_per_unit': float,
+                'supplier': {  # Changed from supplier_id to supplier object
+                    'name': str,
+                    'phone_number': str,
+                    'contact_info': dict (optional),
+                    'tax_id': str (optional)
+                },
+                'specifications': dict (optional),
+                'stock_level': float (optional)
+            }
+        Returns:
+            Material: Created material instance
+        Raises:
+            ValueError: If validation fails or required fields are missing
+        """
         logger.info(f"Creating new material with data: {data}")
-        # Validate required fields
-        required_fields = ['material_code', 'name', 'category', 'type',
-                           'unit_of_measure', 'min_threshold', 'reorder_quantity',
-                           'cost_per_unit', 'supplier_id']
-
-        for field in required_fields:
-            if field not in data:
-                logger.info(f"Missing required field: {field}")
-                raise ValueError(f"Missing required field: {field}")
-
-        # Validate numerical values
-        if data.get('cost_per_unit', 0) <= 0:
-            raise ValueError("Cost per unit must be positive")
-
-        if data.get('min_threshold', 0) < 0:
-            raise ValueError("Minimum threshold cannot be negative")
-
-        # Create material instance
-        material = Material(
-            material_code=data['material_code'],
-            name=data['name'],
-            category=data['category'],
-            type=data['type'],
-            unit_of_measure=data['unit_of_measure'],
-            min_threshold=data['min_threshold'],
-            reorder_quantity=data['reorder_quantity'],
-            cost_per_unit=data['cost_per_unit'],
-            supplier_id=data['supplier_id'],
-            specifications=data.get('specifications', {}),
-            stock_level=data.get('stock_level', 0.0)
-        )
-        logger.info(f"Material {material} created")
 
         try:
-            material.save()
-            return material
-        except IntegrityError as e:
-            logger.error(e)
-            raise ValueError("Material code must be unique")
+            # Validate required fields except supplier_id
+            required_fields = ['material_code', 'name', 'category', 'type',
+                               'unit_of_measure', 'min_threshold', 'reorder_quantity',
+                               'cost_per_unit', 'supplier']
+
+            for field in required_fields:
+                if field not in data:
+                    logger.error(f"Missing required field: {field}")
+                    raise ValueError(f"Missing required field: {field}")
+
+            # Validate numerical values
+            if data.get('cost_per_unit', 0) <= 0:
+                raise ValueError("Cost per unit must be positive")
+
+            if data.get('min_threshold', 0) < 0:
+                raise ValueError("Minimum threshold cannot be negative")
+
+            # Handle supplier creation/retrieval
+            supplier_data = data.pop('supplier')  # Remove supplier from material data
+            supplier = SupplierService.create_supplier(supplier_data)
+
+            logger.info(f"Using supplier: {supplier.phone_number}")
+
+            # Create material instance with supplier_id
+            material = Material(
+                material_code=data['material_code'],
+                name=data['name'],
+                category=data['category'],
+                type=data['type'],
+                unit_of_measure=data['unit_of_measure'],
+                min_threshold=data['min_threshold'],
+                reorder_quantity=data['reorder_quantity'],
+                cost_per_unit=data['cost_per_unit'],
+                supplier_id=supplier.id,  # Use the supplier id
+                specifications=data.get('specifications', {}),
+                stock_level=data.get('stock_level', 0.0)
+            )
+            logger.info(f"Material instance created: {material.material_code}")
+
+            try:
+                material.save()
+                logger.info(f"Material saved successfully: {material.material_code}")
+                return material
+            except IntegrityError as e:
+                logger.error(f"Integrity error: {str(e)}")
+                if "unique constraint" in str(e).lower():
+                    raise ValueError("Material code must be unique")
+                raise ValueError("Database integrity error")
+
+        except Exception as e:
+            logger.error(f"Error in create_material: {str(e)}")
+            raise
 
     @staticmethod
     def get_materials(filters: Optional[Dict] = None) -> List[Material]:

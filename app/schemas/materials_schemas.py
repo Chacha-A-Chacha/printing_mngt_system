@@ -1,13 +1,13 @@
 # schemas/material.py
-from marshmallow import Schema, fields, validate, ValidationError
+from marshmallow import Schema, fields, validate, validates_schema, ValidationError
+
+from app.schemas.supplier_schema import SupplierSchema
 
 
 class MaterialCreateSchema(Schema):
     """
     Primary schema for creating a new material.
-    - Handles basic material properties
-    - Includes stock management fields
-    - Optional custom attributes
+    Includes nested supplier creation/validation.
     """
     # Basic material info
     material_code = fields.String(
@@ -60,16 +60,35 @@ class MaterialCreateSchema(Schema):
         description="Cost per unit of measurement"
     )
 
-    # Relationships
-    supplier_id = fields.Integer(
+    # Replace supplier_id with nested supplier object
+    supplier = fields.Nested(
+        SupplierSchema,
         required=True,
-        validate=validate.Range(min=1),
-        description="ID of the supplier"
+        description="Supplier information"
     )
 
     # Optional fields
-    specifications = fields.Dict(keys=fields.Str(), values=fields.Raw(), missing={})
-    custom_attributes = fields.Dict(keys=fields.Str(), values=fields.Raw(), missing={})
+    specifications = fields.Dict(
+        keys=fields.Str(),
+        values=fields.Raw(),
+        missing={},
+        description="Material specifications (e.g., dimensions)"
+    )
+    custom_attributes = fields.Dict(
+        keys=fields.Str(),
+        values=fields.Raw(),
+        missing={},
+        description="Additional custom attributes"
+    )
+
+    # @validates_schema
+    # def validate_specifications(self, data, **kwargs):
+    #     """Validate specifications if provided"""
+    #     if data.get('specifications'):
+    #         required_specs = ['width', 'thickness']
+    #         for spec in required_specs:
+    #             if spec not in data['specifications']:
+    #                 raise ValidationError(f"Specification must include {spec}", 'specifications')
 
 
 class MaterialUsageCreateSchema(Schema):
