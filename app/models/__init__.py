@@ -1,7 +1,7 @@
 # models/__init__.py
 from typing import List
 
-from .. import db
+from .. import db, logger
 from datetime import datetime
 
 
@@ -35,6 +35,7 @@ class BaseModel(db.Model):
             db.session.add(self)
             db.session.commit()
         except Exception as e:
+            logger.error(e)
             db.session.rollback()
             # Optionally, re-raise the exception or handle it as needed.
             # For example, you could log the error or return a custom error response.

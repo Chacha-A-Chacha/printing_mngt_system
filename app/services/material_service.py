@@ -11,6 +11,7 @@ from typing import List, Dict, Optional
 from sqlalchemy.exc import IntegrityError
 
 from app import db, logger
+from app.models import Job
 from app.models.materials import Material, MaterialUsage, StockTransaction
 from app.services.supplier_service import SupplierService
 
@@ -161,6 +162,9 @@ class MaterialService:
         material = Material.query.get(data['material_id'])
         if not material:
             raise ValueError("Material not found")
+        job = Job.query.get(data['job_id'])
+        if not job:
+            raise ValueError("Job not found")
 
         quantity = float(data['quantity_used'])
         wastage = float(data.get('wastage', 0.0))
@@ -176,14 +180,22 @@ class MaterialService:
         if material.stock_level < total_deduction:
             raise ValueError(f"Insufficient stock. Available: {material.stock_level}, Required: {total_deduction}")
 
+        # Check if job_type is 'in_house'; if outsourced, might raise an error or do nothing.
+        if job.job_type == 'outsourced':
+            raise ValueError("Cannot add material usage to an outsourced job.")
+
+        added_cost = (material.cost_per_unit or 0) * total_deduction
+        job.total_cost += added_cost
+
         # Create usage record
         usage = MaterialUsage(
             material_id=material.id,
             job_id=data['job_id'],
             quantity_used=quantity,
             unit_of_measure=material.unit_of_measure,
-            user_id=data['user_id'],
+            # user_id=data['user_id'],
             wastage=wastage,
+            cost=added_cost,
             notes=data.get('notes', '')
         )
 

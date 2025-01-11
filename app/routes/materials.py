@@ -108,7 +108,7 @@ def list_materials():
     return jsonify([material.serialize() for material in materials]), 200
 
 
-@materials_bp.route("/materials/usage", methods=["POST"])
+@materials_bp.route("/usage", methods=["POST"])
 def record_usage():
     """
         Record material usage for a job
@@ -126,6 +126,32 @@ def record_usage():
             description: Validation error or insufficient stock
           500:
             description: Internal server error
+
+        // POST /materials/usage
+        // Request
+        {
+            "material_id": 1,
+            "job_id": 123,
+            "quantity_used": 25.5,
+            "user_id": 45,
+            "wastage": 0.5,
+            "notes": "Used for banner printing - slight trimming waste"
+        }
+
+        // Response (201)
+        {
+            "message": "Material usage recorded successfully",
+            "usage": {
+                "id": 789,
+                "material_id": 1,
+                "job_id": 123,
+                "quantity_used": 25.5,
+                "wastage": 0.5,
+                "remaining_stock": 474.0,
+                "user_id": 45,
+                "created_at": "2025-01-09T14:30:00"
+            }
+        }
     """
     schema = MaterialUsageCreateSchema()
 
@@ -141,13 +167,15 @@ def record_usage():
                 "quantity_used": usage.quantity_used,
                 "wastage": usage.wastage,
                 "remaining_stock": usage.material.stock_level,
-                "user_id": usage.user_id,
+                # "user_id": usage.user_id,
                 "created_at": usage.created_at.isoformat()
             }
         }), 201
     except ValueError as e:
+        logger.error(e)
         return jsonify({"error": str(e)}), 400
     except Exception as e:
+        logger.error(e)
         return jsonify({"error": "Internal server error"}), 500
 
 

@@ -115,7 +115,7 @@ class MaterialUsageCreateSchema(Schema):
         description="Amount of material used in the job"
     )
     user_id = fields.Integer(
-        required=True,
+        required=False,
         validate=validate.Range(min=1),
         description="ID of user recording the usage"
     )

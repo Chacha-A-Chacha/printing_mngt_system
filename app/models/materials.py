@@ -69,7 +69,7 @@ class MaterialUsage(BaseModel):
     quantity_used = db.Column(db.Float, nullable=False)
     unit_of_measure = db.Column(db.String(20), nullable=False)
     usage_date = db.Column(db.DateTime, default=datetime.now)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     wastage = db.Column(db.Float, default=0.0)
     cost = db.Column(db.Float, nullable=False)  # Added from JobMaterialUsage
     notes = db.Column(db.String(255))
