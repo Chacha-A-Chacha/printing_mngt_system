@@ -2,11 +2,10 @@ from datetime import datetime
 
 from .. import db, logger
 from ..models.expenses import JobExpense
-from ..models.in_house_printing import Material
+from ..models.materials import Material, MaterialUsage
 from ..models.job import (
     Job,
     JobNote,
-    JobMaterialUsage,
     JobTimeframeChangeLog, JobProgressStatus
 )
 from ..models.machine import MachineReading
@@ -335,7 +334,7 @@ class JobMaterialService:
         job.total_cost += added_cost
 
         # Create a usage record
-        material_usage = JobMaterialUsage(
+        material_usage = MaterialUsage(
             job_id=job.id,
             material_id=material.id,
             usage_meters=additional_usage,

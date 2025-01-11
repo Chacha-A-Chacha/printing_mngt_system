@@ -63,3 +63,12 @@ class BaseModel(db.Model):
             Model instance or None
         """
         return cls.query.get(id)
+
+
+# Import order matters
+from .user import User, Role
+from .client import Client
+from .supplier import Supplier
+from .expenses import JobExpense
+from .job import Job, JobNote, JobTimeframeChangeLog
+from .materials import Material, MaterialUsage, StockTransaction

@@ -3,7 +3,7 @@
 from flask import request, jsonify
 from . import in_house_printing_bp
 from .. import logger
-from ..models.in_house_printing import Material
+from ..models.materials import Material
 from ..models.job import Job
 from ..models.client import Client
 from ..models.machine import MachineReading

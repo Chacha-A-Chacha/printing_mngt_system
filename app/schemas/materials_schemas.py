@@ -201,3 +201,95 @@ class StockAdjustmentSchema(Schema):
         validate=validate.Length(min=1, max=255),
         description="Detailed explanation for adjustment"
     )
+
+
+class StockReportRequestSchema(Schema):
+    """Schema for stock report requests - both display and download"""
+    view_type = fields.String(
+        required=True,
+        validate=validate.OneOf([
+            "DISPLAY",  # For frontend JSON data
+            "PDF",  # For file downloads
+            "CSV",
+            "EXCEL"
+        ]),
+        description="How the report should be returned"
+    )
+    report_type = fields.String(
+        required=True,
+        validate=validate.OneOf([
+            "CURRENT_STOCK",
+            "BELOW_THRESHOLD",
+            "STOCK_HISTORY",
+            "STOCK_VALUE"
+        ])
+    )
+    # Filtering parameters
+    start_date = fields.Date(missing=None)
+    end_date = fields.Date(missing=None)
+    category = fields.String(missing=None)
+    supplier_id = fields.Integer(missing=None)
+
+    # Sorting parameters
+    sort_by = fields.String(
+        missing='name',
+        validate=validate.OneOf([
+            'name', 'stock_level', 'value',
+            'category', 'last_updated'
+        ])
+    )
+    sort_order = fields.String(
+        missing='asc',
+        validate=validate.OneOf(['asc', 'desc'])
+    )
+
+
+class MaterialUsageReportRequestSchema(Schema):
+    """Schema for material usage report requests"""
+    view_type = fields.String(
+        required=True,
+        validate=validate.OneOf([
+            "DISPLAY",  # Frontend JSON data
+            "PDF",
+            "CSV",
+            "EXCEL"
+        ]),
+        description="How the report should be returned"
+    )
+    report_type = fields.String(
+        required=True,
+        validate=validate.OneOf([
+            "USAGE_BY_JOB",
+            "USAGE_BY_PERIOD",
+            "WASTAGE_ANALYSIS",
+            "USAGE_TRENDS"
+        ])
+    )
+    # Time range - required for usage reports
+    start_date = fields.Date(required=True)
+    end_date = fields.Date(required=True)
+
+    # Optional filters
+    material_id = fields.Integer(missing=None)
+    job_id = fields.Integer(missing=None)
+    category = fields.String(missing=None)
+    user_id = fields.Integer(missing=None)
+
+    # Grouping option
+    group_by = fields.String(
+        missing='day',
+        validate=validate.OneOf(['day', 'week', 'month'])
+    )
+
+    # Sorting
+    sort_by = fields.String(
+        missing='date',
+        validate=validate.OneOf([
+            'date', 'quantity', 'wastage',
+            'material_name', 'job_id'
+        ])
+    )
+    sort_order = fields.String(
+        missing='desc',
+        validate=validate.OneOf(['asc', 'desc'])
+    )

@@ -3,6 +3,9 @@ from datetime import datetime
 from . import BaseModel
 from .. import db
 
+from .user import User
+from .supplier import Supplier
+
 
 class Material(BaseModel):
     __tablename__ = 'materials'
@@ -68,12 +71,13 @@ class MaterialUsage(BaseModel):
     usage_date = db.Column(db.DateTime, default=datetime.now)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     wastage = db.Column(db.Float, default=0.0)
+    cost = db.Column(db.Float, nullable=False)  # Added from JobMaterialUsage
     notes = db.Column(db.String(255))
 
     # Relationships
     material = db.relationship('Material', backref='usages')
-    job = db.relationship('Job', backref='material_usages')
-    # user = db.relationship('User', backref='material_usages')
+    job = db.relationship('Job', foreign_keys=[job_id])
+    user = db.relationship('User', backref='material_usages')
 
     def serialize(self):
         return {
@@ -83,6 +87,7 @@ class MaterialUsage(BaseModel):
             "quantity_used": self.quantity_used,
             "unit_of_measure": self.unit_of_measure,
             "wastage": self.wastage,
+            "cost": self.cost,
             "notes": self.notes,
             "user_id": self.user_id,
             "usage_date": self.usage_date.isoformat(),
@@ -107,7 +112,7 @@ class StockTransaction(BaseModel):
 
     # Relationships
     material = db.relationship('Material', backref='stock_transactions')
-    # user = db.relationship('User', backref='stock_transactions')
+    user = db.relationship('User', backref='stock_transactions')
 
     def serialize(self):
         return {

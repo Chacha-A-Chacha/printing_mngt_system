@@ -64,35 +64,78 @@ class DatabaseConfig:
     """
     Database configuration with environment variable support
     """
+    # SQLAlchemy Settings
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Connection Pool Settings
     SQLALCHEMY_POOL_SIZE = int(os.environ.get('DATABASE_POOL_SIZE', 10))
     SQLALCHEMY_MAX_OVERFLOW = int(os.environ.get('DATABASE_MAX_OVERFLOW', 20))
+    SQLALCHEMY_POOL_TIMEOUT = int(os.environ.get('DATABASE_POOL_TIMEOUT', 30))
+    SQLALCHEMY_POOL_RECYCLE = int(os.environ.get('DATABASE_POOL_RECYCLE', 1800))  # 30 minutes
+
+    # Query Performance Settings
+    SQLALCHEMY_ECHO = os.environ.get('SQLALCHEMY_ECHO', 'false').lower() in ['true', 'on', '1']
+    SQLALCHEMY_RECORD_QUERIES = os.environ.get('SQLALCHEMY_RECORD_QUERIES', 'false').lower() in ['true', 'on', '1']
+    DATABASE_QUERY_TIMEOUT = int(os.environ.get('DATABASE_QUERY_TIMEOUT', 0.5))  # In seconds
 
     @staticmethod
     def get_database_uri(config_name):
         """
         Generate database URI based on configuration environment
 
-        :param config_name: Name of the configuration environment
-        :return: Database connection URI
+        Args:
+            config_name: Name of the configuration environment
+        Returns:
+            str: Database connection URI
         """
         # For testing, always use in-memory SQLite
         if config_name == 'testing':
             return 'sqlite:///:memory:'
 
-        # Use environment variable for database URL, with fallback
+        # Database connection parameters from environment
+        db_user = os.environ.get('DATABASE_USER')
+        db_password = os.environ.get('DATABASE_PASSWORD')
+        db_host = os.environ.get('DATABASE_HOST', 'localhost')
+        db_port = os.environ.get('DATABASE_PORT', '3306')  # Default MySQL port
+        db_name = os.environ.get('DATABASE_NAME', 'printing_management_db')
+
+        # Use environment variable for complete database URL if provided
         db_url = os.environ.get('DATABASE_URL')
-        print("DEBUG: DATABASE_URL =", db_url)
 
-        if not db_url:
-            default_db_path = os.path.join(
-                os.path.abspath(os.path.dirname(__file__)),
-                '..',
-                'printing_management.db'
-            )
-            db_url = f'sqlite:////{default_db_path}'
+        if db_url:
+            return db_url
 
-        return db_url
+        # Construct URL if individual parameters are provided
+        if all([db_user, db_password, db_host, db_name]):
+            return f'mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+
+        # Fallback to SQLite
+        default_db_path = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)),
+            '..',
+            'printing_management.db'
+        )
+        return f'sqlite:////{default_db_path}'
+
+    @staticmethod
+    def init_db(app):
+        """
+        Initialize database-specific settings
+
+        Args:
+            app: Flask application instance
+        """
+        app.logger.debug("Initializing database settings...")
+
+        # Log database connection details (excluding sensitive info)
+        db_host = os.environ.get('DATABASE_HOST', 'localhost')
+        db_name = os.environ.get('DATABASE_NAME', 'printing_management_db')
+        app.logger.info(f"Connecting to database: {db_name} on {db_host}")
+
+        # Log pool settings
+        app.logger.debug(f"Pool Size: {DatabaseConfig.SQLALCHEMY_POOL_SIZE}")
+        app.logger.debug(f"Max Overflow: {DatabaseConfig.SQLALCHEMY_MAX_OVERFLOW}")
+        app.logger.debug(f"Pool Recycle: {DatabaseConfig.SQLALCHEMY_POOL_RECYCLE}")
 
 
 class DevelopmentConfig(BaseConfig, DatabaseConfig):

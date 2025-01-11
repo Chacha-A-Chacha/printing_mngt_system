@@ -4,7 +4,8 @@ from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKe
 from sqlalchemy.orm import relationship
 from app import db
 from . import BaseModel
-from .in_house_printing import Material  # Adjust import if needed
+from .materials import Material  # Adjust import if needed
+from .client import Client
 
 
 class JobProgressStatus(enum.Enum):
@@ -90,13 +91,8 @@ class Job(BaseModel):
     total_profit = Column(Float, nullable=True,
                           doc="Calculated as total_amount - total_cost, or updated at runtime.")
 
-    # Relationships
-    expenses = relationship("JobExpense", backref="job", lazy='dynamic',
-                            doc="Collection of expenses associated with this job.")
     notes = relationship("JobNote", backref="job", lazy='dynamic',
                          doc="Notes or comments linked to the job.")
-    material_usages = relationship("JobMaterialUsage", backref="job", lazy='dynamic',
-                                   doc="Tracks materials and usage meters for in-house jobs.")
     timeframe_logs = relationship("JobTimeframeChangeLog", backref="job", lazy='dynamic',
                                   doc="History of changes to the job's timeframe.")
 
@@ -164,35 +160,6 @@ class JobNote(BaseModel):
 
     job_id = Column(Integer, ForeignKey('jobs.id'), nullable=False)
     note = Column(Text, nullable=False, doc="The text content of this note.")
-
-
-class JobMaterialUsage(BaseModel):
-    """
-    Links a Job to a specific Material usage (in meters, pieces, etc.).
-    Primarily relevant for in-house jobs that rely on internal inventory.
-    """
-
-    __tablename__ = 'job_material_usages'
-
-    job_id = Column(Integer, ForeignKey('jobs.id'), nullable=False)
-    material_id = Column(Integer, ForeignKey('materials.id'), nullable=False)
-    usage_meters = Column(Float, nullable=False, doc="Number of meters used, if relevant for in-house materials.")
-    cost = Column(Float, nullable=False, doc="Calculated cost from usage_meters * cost_per_sq_meter or similar.")
-
-    material = relationship("Material", backref="job_material_usages")
-
-    def to_dict(self):
-        """
-
-        :return: A dictionary representation of this usage record
-        """
-        return {
-            "id": self.id,
-            "material_id": self.material_id,
-            "material_name": self.material.name if self.material else None,
-            "usage_meters": self.usage_meters,
-            "cost": self.cost
-        }
 
 
 class JobTimeframeChangeLog(BaseModel):
