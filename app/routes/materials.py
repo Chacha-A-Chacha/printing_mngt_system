@@ -133,7 +133,7 @@ def record_usage():
             "material_id": 1,
             "job_id": 123,
             "quantity_used": 25.5,
-            "user_id": 45,
+            "user_id": 45,   // incase audit logic us functional
             "wastage": 0.5,
             "notes": "Used for banner printing - slight trimming waste"
         }
@@ -213,16 +213,16 @@ def restock_material():
                 "previous_stock": transaction.previous_stock,
                 "new_stock_level": transaction.new_stock,
                 "reference_number": transaction.reference_number,
-                "cost_per_unit": transaction.cost_per_unit,
-                "supplier_id": transaction.supplier_id,
-                "user_id": transaction.user_id,
+                # "user_id": transaction.user_id,
                 "created_at": transaction.created_at.isoformat(),
                 "notes": transaction.notes
             }
         }), 201
     except ValueError as e:
+        logger.error(e)
         return jsonify({"error": str(e)}), 400
     except Exception as e:
+        logger.error(e)
         return jsonify({"error": "Internal server error"}), 500
 
 

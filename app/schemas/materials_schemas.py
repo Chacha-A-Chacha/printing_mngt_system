@@ -151,7 +151,7 @@ class MaterialRestockSchema(Schema):
         description="Quantity being added to stock"
     )
     user_id = fields.Integer(
-        required=True,
+        required=False,  # True for audit control logic
         validate=validate.Range(min=1),
         description="ID of user recording the restock"
     )
@@ -165,10 +165,10 @@ class MaterialRestockSchema(Schema):
         missing=None,
         description="Cost per unit for this specific restock"
     )
-    supplier_id = fields.Integer(
-        validate=validate.Range(min=1),
-        missing=None,
-        description="ID of supplier for this delivery"
+    supplier = fields.Nested(
+        SupplierSchema,
+        required=True,
+        description="Supplier information"
     )
     notes = fields.String(
         validate=validate.Length(max=255),

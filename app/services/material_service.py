@@ -225,9 +225,11 @@ class MaterialService:
         return query.order_by(MaterialUsage.usage_date.desc()).all()
 
     @staticmethod
+    @staticmethod
     def restock_material(data: dict) -> StockTransaction:
         """
-        Handle material restocking from supplier deliveries
+        Handle material restocking from supplier deliveries with supplier management
+        and cost updates.
 
         Args:
             data: {
@@ -235,37 +237,75 @@ class MaterialService:
                 'quantity': float,
                 'user_id': int,
                 'reference_number': str,  # PO number
+                'cost_per_unit': float,  # New cost per unit
+                'supplier': {             # Supplier information
+                    'name': str,
+                    'phone_number': str,
+                    'contact_info': dict,
+                },
                 'notes': str
             }
+        Returns:
+            StockTransaction: Created transaction record
+        Raises:
+            ValueError: If validation fails
         """
-        material = Material.query.get(data['material_id'])
+        logger.info(f"Processing restock for material ID: {data['material_id']}")
 
-        if not material:
-            raise ValueError("Material not found")
+        try:
+            material = Material.query.get(data['material_id'])
+            if not material:
+                logger.error(f"Material not found: {data['material_id']}")
+                raise ValueError("Material not found")
 
-        quantity = float(data['quantity'])
-        if quantity <= 0:
-            raise ValueError("Restock quantity must be positive")
+            quantity = float(data['quantity'])
+            if quantity <= 0:
+                raise ValueError("Restock quantity must be positive")
 
-        previous_stock = material.stock_level
-        material.stock_level += quantity
+            # Handle supplier creation/retrieval
+            supplier_data = data.get('supplier')
+            if supplier_data:
+                supplier = SupplierService.create_supplier(supplier_data)
+                logger.info(f"Using supplier: {supplier.phone_number}")
 
-        transaction = StockTransaction(
-            material_id=material.id,
-            transaction_type='RESTOCK',
-            quantity=quantity,
-            previous_stock=previous_stock,
-            new_stock=material.stock_level,
-            user_id=data['user_id'],
-            reference_number=data.get('reference_number'),
-            notes=data.get('notes', '')
-        )
+                # Update material's supplier if different
+                if material.supplier_id != supplier.id:
+                    logger.info(f"Updating material supplier from {material.supplier_id} to {supplier.id}")
+                    material.supplier_id = supplier.id
 
-        # Use model's save methods
-        material.save()
-        transaction.save()
+            # Update cost if provided
+            new_cost = data.get('cost_per_unit')
+            if new_cost is not None and new_cost > 0:
+                logger.info(f"Updating cost per unit from {material.cost_per_unit} to {new_cost}")
+                material.cost_per_unit = new_cost
 
-        return transaction
+            # Record stock changes
+            previous_stock = material.stock_level
+            material.stock_level += quantity
+
+            # Create transaction record
+            transaction = StockTransaction(
+                material_id=material.id,
+                transaction_type='RESTOCK',
+                quantity=quantity,
+                previous_stock=previous_stock,
+                new_stock=material.stock_level,
+                user_id=data['user_id'],
+                reference_number=data['reference_number'],
+                notes=data.get('notes', ''),
+                supplier_id=supplier.id  # Track supplier for this transaction
+            )
+
+            # Save changes
+            material.save()
+            transaction.save()
+
+            logger.info(f"Successfully restocked material {material.material_code}")
+            return transaction
+
+        except Exception as e:
+            logger.error(f"Error in restock_material: {str(e)}")
+            raise
 
     @staticmethod
     def adjust_stock(data: dict) -> StockTransaction:
@@ -289,6 +329,8 @@ class MaterialService:
         if new_stock < 0:
             raise ValueError("Stock level cannot be negative")
 
+        # Update supplier information
+
         previous_stock = material.stock_level
         quantity_difference = new_stock - previous_stock
 
@@ -298,7 +340,7 @@ class MaterialService:
             quantity=quantity_difference,
             previous_stock=previous_stock,
             new_stock=new_stock,
-            user_id=data['user_id'],
+            # user_id=data['user_id'],
             reference_number=data.get('reference_number'),
             notes=data.get('notes', '')
         )

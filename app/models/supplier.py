@@ -12,3 +12,12 @@ class Supplier(BaseModel):
 
     def __repr__(self):
         return f"<Supplier {self.name}>"
+
+    def serialize(self):
+        return {
+            'name': self.name,
+            'phone_number': self.phone_number,
+            'contact_info': self.contact_info,
+            'tax_id': self.tax_id
+
+        }

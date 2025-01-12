@@ -106,13 +106,16 @@ class StockTransaction(BaseModel):
     quantity = db.Column(db.Float, nullable=False)
     previous_stock = db.Column(db.Float, nullable=False)
     new_stock = db.Column(db.Float, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    reference_number = db.Column(db.String(50))  # PO number or adjustment reference
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
+    reference_number = db.Column(db.String(50))
     notes = db.Column(db.String(255))
+    cost_per_unit = db.Column(db.Float, nullable=True)  # Track cost at time of transaction
 
     # Relationships
     material = db.relationship('Material', backref='stock_transactions')
     user = db.relationship('User', backref='stock_transactions')
+    supplier = db.relationship('Supplier', backref='stock_transactions')
 
     def serialize(self):
         return {
@@ -123,6 +126,8 @@ class StockTransaction(BaseModel):
             "previous_stock": self.previous_stock,
             "new_stock": self.new_stock,
             "reference_number": self.reference_number,
+            "cost_per_unit": self.cost_per_unit,
+            "supplier": self.supplier.serialize() if self.supplier else None,
             "notes": self.notes,
             "user_id": self.user_id,
             "created_at": self.created_at.isoformat(),
