@@ -290,7 +290,7 @@ class MaterialService:
                 quantity=quantity,
                 previous_stock=previous_stock,
                 new_stock=material.stock_level,
-                user_id=data['user_id'],
+                # user_id=data['user_id'],
                 reference_number=data['reference_number'],
                 notes=data.get('notes', ''),
                 supplier_id=supplier.id  # Track supplier for this transaction

@@ -107,7 +107,7 @@ class StockTransaction(BaseModel):
     previous_stock = db.Column(db.Float, nullable=False)
     new_stock = db.Column(db.Float, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=True)
     reference_number = db.Column(db.String(50))
     notes = db.Column(db.String(255))
     cost_per_unit = db.Column(db.Float, nullable=True)  # Track cost at time of transaction

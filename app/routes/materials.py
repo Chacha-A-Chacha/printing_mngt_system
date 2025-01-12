@@ -259,7 +259,7 @@ def adjust_stock():
                 "adjustment": transaction.quantity,  # Difference between old and new
                 "previous_stock": transaction.previous_stock,
                 "new_stock_level": transaction.new_stock,
-                "adjustment_reason": transaction.adjustment_reason,
+                # "adjustment_reason": transaction.adjustment_reason,
                 "reference_number": transaction.reference_number,
                 "notes": transaction.notes,
                 "user_id": transaction.user_id,
@@ -267,8 +267,10 @@ def adjust_stock():
             }
         }), 201
     except ValueError as e:
+        logger.error(e)
         return jsonify({"error": str(e)}), 400
     except Exception as e:
+        logger.error(e)
         return jsonify({"error": "Internal server error"}), 500
 
 
