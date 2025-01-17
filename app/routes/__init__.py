@@ -21,6 +21,9 @@ client_bp = Blueprint('client', __name__)
 # Supplier management routes
 supplier_bp = Blueprint('supplier', __name__)
 
+# Machine logging routes
+machine_logs_bp = Blueprint('machine', __name__)
+
 # Reporting routes
 reporting_bp = Blueprint('reporting', __name__)
 
@@ -30,8 +33,8 @@ from . import (
     materials,
     jobs,
     in_house_printing,
-    outsourced_production,
     client,
     supplier,
+    machine_logs,
     reporting
 )

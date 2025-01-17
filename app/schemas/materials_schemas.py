@@ -195,7 +195,7 @@ class StockAdjustmentSchema(Schema):
         description="New total stock level after adjustment"
     )
     user_id = fields.Integer(
-        required=True,
+        required=False,
         validate=validate.Range(min=1),
         description="ID of user performing adjustment"
     )

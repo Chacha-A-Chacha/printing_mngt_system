@@ -1,11 +1,12 @@
 # routes/jobs.py
 from datetime import datetime
 from sqlalchemy import and_
-
 from flask import request, jsonify
+# from flask_caching import cache_control
+
 from . import jobs_bp
 from app import logger
-from ..models.materials import Material
+from ..models.materials import Material, MaterialUsage
 from ..models.job import Job, JobProgressStatus
 from ..schemas.job_schemas import JobProgressUpdateSchema, \
     JobMaterialSchema, JobCreateSchema, ExpenseSchema, JobTimeframeUpdateSchema
@@ -42,7 +43,8 @@ def create_job():
         {
           "name": "Design Fee",
           "cost": 50.0,
-          "shared": false
+          "shared": false,
+          "job_ids": []
         }
       ]
     }
@@ -242,6 +244,7 @@ def update_job_progress(job_id):
     try:
         validated_data = schema.load(data)
     except ValidationError as err:
+        logger.error(err)
         return jsonify({"errors": err.messages}), 400
 
     # 2. Get job
@@ -251,9 +254,10 @@ def update_job_progress(job_id):
     try:
         updated_job = JobProgressService.update(job, validated_data)
     except ValueError as ve:
-        logger.info()
+        logger.error(ve)
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
+        logger.info(e)
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
     return jsonify({"message": "Job progress updated", "job": updated_job.to_dict()}), 200
@@ -377,19 +381,32 @@ def get_job_detail(job_id):
     job_data["expenses"] = expense_list
 
     # (C) Attach material usages
+    # Add material usage information
+    material_usages = MaterialUsage.query.filter_by(job_id=job_id).all()
     usage_list = []
-    for usage_record in job.material_usages:
-        # If we have usage_record.to_dict(), we can call it:
-        if hasattr(usage_record, "to_dict"):
-            usage_list.append(usage_record.to_dict())
-        else:
-            # fallback if to_dict not defined
-            usage_list.append({
-                "id": usage_record.id,
-                "material_id": usage_record.material_id,
-                "usage_meters": usage_record.usage_meters,
-                "cost": usage_record.cost
-            })
+
+    for usage in material_usages:
+        usage_data = usage.serialize()
+
+        # Add material details
+        if usage.material:
+            usage_data["material"] = {
+                "id": usage.material.id,
+                "name": usage.material.name,
+                "material_code": usage.material.material_code,
+                "unit_of_measure": usage.material.unit_of_measure,
+                "cost_per_unit": usage.material.cost_per_unit
+            }
+
+        # Add user details if needed
+        if usage.user:
+            usage_data["user"] = {
+                "id": usage.user.id,
+                "name": usage.user.name  # Assuming User model has a name field
+            }
+
+        usage_list.append(usage_data)
+
     job_data["material_usages"] = usage_list
 
     return jsonify(job_data), 200
@@ -451,6 +468,7 @@ def list_jobs():
 
 
 @jobs_bp.route("/jobs/summary", methods=["GET"])
+# @cache_control(max_age=300)  # 5 minutes cache
 def list_jobs_summary():
     """
     Retrieve filtered and paginated jobs from the database.
@@ -463,23 +481,42 @@ def list_jobs_summary():
     - startDate: Filter jobs after this date (ISO format)
     - endDate: Filter jobs before this date (ISO format)
     """
-    # Get query parameters with defaults
-    page = int(request.args.get('page', 1))
-    limit = int(request.args.get('limit', 10))
+    # Input validation for pagination
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 10))
+
+        if page < 1:
+            return jsonify({"error": "Page number must be positive"}), 400
+        if limit < 1 or limit > 100:
+            return jsonify({"error": "Limit must be between 1 and 100"}), 400
+    except ValueError:
+        return jsonify({"error": "Invalid page or limit parameter"}), 400
+
+    # Get filter parameters
     job_type = request.args.get('jobType')
     progress_status = request.args.get('progressStatus')
     start_date = request.args.get('startDate')
     end_date = request.args.get('endDate')
 
-    # Start with base query
-    query = Job.query
+    # Start with base query and default ordering
+    query = Job.query.order_by(Job.created_at.desc())
+
+    # Helper function for date parsing
+    def parse_iso_date(date_str, field_name):
+        try:
+            return datetime.fromisoformat(date_str)
+        except ValueError:
+            return jsonify({
+                "error": f"Invalid {field_name} format. Use ISO format (YYYY-MM-DD)"
+            }), 400
 
     # Apply filters if provided
     filters = []
     if job_type and job_type != 'all':
         filters.append(Job.job_type == job_type)
+
     if progress_status and progress_status != 'all':
-        # Convert string status to enum for comparison
         try:
             enum_status = JobProgressStatus(progress_status)
             filters.append(Job.progress_status == enum_status)
@@ -489,25 +526,27 @@ def list_jobs_summary():
             }), 400
 
     if start_date:
-        try:
-            start_datetime = datetime.fromisoformat(start_date)
-            filters.append(Job.created_at >= start_datetime)
-        except ValueError:
-            return jsonify({
-                "error": "Invalid start date format. Use ISO format (YYYY-MM-DD)"
-            }), 400
+        start_datetime = parse_iso_date(start_date, 'start date')
+        if isinstance(start_datetime, tuple):  # Error response
+            return start_datetime
+        filters.append(Job.created_at >= start_datetime)
 
     if end_date:
-        try:
-            end_datetime = datetime.fromisoformat(end_date)
-            filters.append(Job.created_at <= end_datetime)
-        except ValueError:
-            return jsonify({
-                "error": "Invalid end date format. Use ISO format (YYYY-MM-DD)"
-            }), 400
+        end_datetime = parse_iso_date(end_date, 'end date')
+        if isinstance(end_datetime, tuple):  # Error response
+            return end_datetime
+        filters.append(Job.created_at <= end_datetime)
 
+    # Apply filters to query
     if filters:
         query = query.filter(and_(*filters))
+
+    # Log the request
+    logger.info(
+        f"Jobs summary requested - page: {page}, limit: {limit}, "
+        f"filters: jobType={job_type}, progressStatus={progress_status}, "
+        f"dateRange={start_date} to {end_date}"
+    )
 
     # Execute query with pagination
     paginated_jobs = query.paginate(
@@ -523,13 +562,13 @@ def list_jobs_summary():
         job_list.append({
             "id": job.id,
             "client_name": client_name,
-            "progress_status": job.progress_status.value if job.progress_status else None,  # Get enum value
+            "progress_status": job.progress_status.value if job.progress_status else None,
             "job_type": job.job_type,
             "created_at": job.created_at.isoformat() if job.created_at else None,
             "payment_status": job.payment_status
         })
 
-    # Return paginated response
+    # Return paginated response with filter information
     return jsonify({
         "jobs": job_list,
         "pagination": {
@@ -537,5 +576,11 @@ def list_jobs_summary():
             "totalPages": paginated_jobs.pages,
             "totalItems": paginated_jobs.total,
             "itemsPerPage": limit
+        },
+        "filters": {
+            "jobType": job_type,
+            "progressStatus": progress_status,
+            "startDate": start_date,
+            "endDate": end_date
         }
     }), 200

@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, func, Enum
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, func, Enum, Index
 from sqlalchemy.orm import relationship
 from app import db
 from . import BaseModel
@@ -42,7 +42,10 @@ class Job(BaseModel):
 
     __tablename__ = 'jobs'
 
-    # Primary Key
+    __table_args__ = (
+        Index('idx_job_created_at', 'created_at'),
+        Index('idx_job_type_status', 'job_type', 'progress_status')
+    )
 
     # Linking to an existing client
     client_id = Column(Integer, ForeignKey('clients.id'), nullable=False)

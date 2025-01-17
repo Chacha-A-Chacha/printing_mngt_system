@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from datetime import datetime
 from io import BytesIO
 import csv
@@ -156,57 +156,88 @@ class MaterialService:
         return query.all()
 
     @staticmethod
-    def record_material_usage(data: dict) -> MaterialUsage:
-        """Records material usage"""
-        # Fetch material
-        material = Material.query.get(data['material_id'])
-        if not material:
-            raise ValueError("Material not found")
-        job = Job.query.get(data['job_id'])
-        if not job:
-            raise ValueError("Job not found")
+    def record_material_usage(data: Union[dict, list]) -> Union[MaterialUsage, List[MaterialUsage]]:
+        """
+        Records material usage - handles both single and multiple materials
 
-        quantity = float(data['quantity_used'])
-        wastage = float(data.get('wastage', 0.0))
-        total_deduction = quantity + wastage
+        Args:
+            data: Either a dict for single material or list of dicts for multiple materials
 
-        # Validate quantities
-        if quantity <= 0:
-            raise ValueError("Usage quantity must be positive")
-        if wastage < 0:
-            raise ValueError("Wastage cannot be negative")
+        Returns:
+            Single MaterialUsage object or list of MaterialUsage objects
+        """
 
-        # Check stock availability
-        if material.stock_level < total_deduction:
-            raise ValueError(f"Insufficient stock. Available: {material.stock_level}, Required: {total_deduction}")
+        def process_single_usage(usage_data: dict) -> MaterialUsage:
+            # Fetch material
+            material = Material.query.get(usage_data['material_id'])
+            if not material:
+                raise ValueError("Material not found")
+            job = Job.query.get(usage_data['job_id'])
+            if not job:
+                raise ValueError("Job not found")
 
-        # Check if job_type is 'in_house'; if outsourced, might raise an error or do nothing.
-        if job.job_type == 'outsourced':
-            raise ValueError("Cannot add material usage to an outsourced job.")
+            quantity = float(usage_data['quantity_used'])
+            wastage = float(usage_data.get('wastage', 0.0))
+            total_deduction = quantity + wastage
 
-        added_cost = (material.cost_per_unit or 0) * total_deduction
-        job.total_cost += added_cost
+            # Validate quantities
+            if quantity <= 0:
+                raise ValueError("Usage quantity must be positive")
+            if wastage < 0:
+                raise ValueError("Wastage cannot be negative")
 
-        # Create usage record
-        usage = MaterialUsage(
-            material_id=material.id,
-            job_id=data['job_id'],
-            quantity_used=quantity,
-            unit_of_measure=material.unit_of_measure,
-            # user_id=data['user_id'],
-            wastage=wastage,
-            cost=added_cost,
-            notes=data.get('notes', '')
-        )
+            # Check stock availability
+            if material.stock_level < total_deduction:
+                raise ValueError(f"Insufficient stock. Available: {material.stock_level}, Required: {total_deduction}")
 
-        # Update stock level
-        material.stock_level -= total_deduction
+            # Check if job_type is 'in_house'
+            if job.job_type == 'outsourced':
+                raise ValueError("Cannot add material usage to an outsourced job.")
 
-        # Save both changes using the model's save method
-        material.save()  # This handles its own transaction
-        usage.save()  # This handles its own transaction
+            added_cost = (material.cost_per_unit or 0) * total_deduction
+            job.total_cost += added_cost
 
-        return usage
+            # Create usage record
+            usage = MaterialUsage(
+                material_id=material.id,
+                job_id=usage_data['job_id'],
+                quantity_used=quantity,
+                unit_of_measure=material.unit_of_measure,
+                wastage=wastage,
+                cost=added_cost,
+                notes=usage_data.get('notes', '')
+            )
+
+            # Update stock level
+            material.stock_level -= total_deduction
+
+            # Save both changes using the model's save method
+            material.save()  # This handles its own transaction
+            usage.save()  # This handles its own transaction
+
+            return usage
+
+        # Handle both single and multiple materials
+        if isinstance(data, list):
+            usages = []
+            for usage_data in data:
+                try:
+                    usage = process_single_usage(usage_data)
+                    usages.append(usage)
+                except ValueError as e:
+                    # Rollback previous successful operations if any failure occurs
+                    for prev_usage in usages:
+                        # Restore material stock levels
+                        material = Material.query.get(prev_usage.material_id)
+                        if material:
+                            material.stock_level += prev_usage.quantity_used + prev_usage.wastage
+                            material.save()
+                        # Delete usage record
+                        prev_usage.delete()
+                    raise ValueError(f"Error processing material {usage_data.get('material_id')}: {str(e)}")
+            return usages
+        else:
+            return process_single_usage(data)
 
     @staticmethod
     def get_material_usage_history(

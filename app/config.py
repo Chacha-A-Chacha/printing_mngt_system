@@ -15,6 +15,8 @@ class BaseConfig:
     # Secret Key
     SECRET_KEY = os.environ.get('SECRET_KEY', 'fallback-secret-key-for-development')
 
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:3000').split(',')
+
     # Security settings
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'true').lower() in ['true', 'on', '1']
     SESSION_COOKIE_HTTPONLY = os.environ.get('SESSION_COOKIE_HTTPONLY', 'true').lower() in ['true', 'on', '1']

@@ -49,19 +49,21 @@ def create_app(config_name):
     # Create Flask app instance
     app = Flask(__name__)
 
+    # Load configuration
+    config_class = get_config(config_name)
+    app.config.from_object(config_class)
+
     # Enhanced CORS configuration
     cors_options = {
-        'origins': app.config.get('CORS_ORIGINS', '*'),
-        'methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        'allow_headers': ['Content-Type', 'Authorization'],
+        'origins': app.config['CORS_ORIGINS'],
+        'methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+        'allow_headers': ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'If-Match', 'If-None-Match',
+                          'Expires'],
         'expose_headers': ['Content-Range', 'X-Total-Count'],
         'supports_credentials': True
     }
     CORS(app, **cors_options)
-
-    # Load configuration
-    config_class = get_config(config_name)
-    app.config.from_object(config_class)
+    logger.debug(f"CORS Origins configured: {app.config['CORS_ORIGINS']}")
 
     # Configure logging
     if app.config.get('LOG_TO_STDOUT'):
@@ -107,6 +109,7 @@ def _register_blueprints(app):
         jobs_bp,
         materials_bp,
         supplier_bp,
+        machine_logs_bp,
         reporting_bp
     )
 
@@ -118,6 +121,7 @@ def _register_blueprints(app):
         (jobs_bp, '/print'),
         (materials_bp, '/materials'),
         (supplier_bp, '/suppliers'),
+        (machine_logs_bp, '/machine'),
         (reporting_bp, '/reports')
     ]
 

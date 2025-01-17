@@ -111,71 +111,100 @@ def list_materials():
 @materials_bp.route("/usage", methods=["POST"])
 def record_usage():
     """
-        Record material usage for a job
-        ---
-        tags:
-          - Materials
-        requestBody:
-          content:
-            application/json:
-              schema: MaterialUsageCreateSchema
-        responses:
-          201:
-            description: Material usage recorded successfully
-          400:
-            description: Validation error or insufficient stock
-          500:
-            description: Internal server error
+    Record material usage for a job - supports single or multiple materials
+    ---
+    tags:
+      - Materials
+    requestBody:
+      content:
+        application/json:
+          schema: MaterialUsageCreateSchema
+    responses:
+      201:
+        description: Material usage recorded successfully
+      400:
+        description: Validation error or insufficient stock
+      500:
+        description: Internal server error
 
-        // POST /materials/usage
-        // Request
+    Example requests:
+
+    Single material:
+    {
+        "material_id": 1,
+        "job_id": 123,
+        "quantity_used": 25.5,
+        "user_id": 45,
+        "wastage": 0.5,
+        "notes": "Used for banner printing"
+    }
+
+    Multiple materials:
+    [
         {
             "material_id": 1,
             "job_id": 123,
             "quantity_used": 25.5,
-            "user_id": 45,   // incase audit logic us functional
+            "user_id": 45,
             "wastage": 0.5,
-            "notes": "Used for banner printing - slight trimming waste"
-        }
-
-        // Response (201)
+            "notes": "Banner printing"
+        },
         {
-            "message": "Material usage recorded successfully",
-            "usage": {
-                "id": 789,
-                "material_id": 1,
-                "job_id": 123,
-                "quantity_used": 25.5,
-                "wastage": 0.5,
-                "remaining_stock": 474.0,
-                "user_id": 45,
-                "created_at": "2025-01-09T14:30:00"
-            }
+            "material_id": 2,
+            "job_id": 123,
+            "quantity_used": 10.0,
+            "user_id": 45,
+            "wastage": 0.2,
+            "notes": "Additional vinyl"
         }
+    ]
     """
-    schema = MaterialUsageCreateSchema()
-
     try:
-        data = schema.load(request.get_json())
-        usage = MaterialService.record_material_usage(data)
-        return jsonify({
-            "message": "Material usage recorded successfully",
-            "usage": {
-                "id": usage.id,
-                "material_id": usage.material_id,
-                "job_id": usage.job_id,
-                "quantity_used": usage.quantity_used,
-                "wastage": usage.wastage,
-                "remaining_stock": usage.material.stock_level,
-                # "user_id": usage.user_id,
-                "created_at": usage.created_at.isoformat()
-            }
-        }), 201
+        data = request.get_json()
+
+        # Check if input is a list or single object
+        if isinstance(data, list):
+            schema = MaterialUsageCreateSchema(many=True)
+            usages = []
+            for usage_data in schema.load(data):
+                usage = MaterialService.record_material_usage(usage_data)
+                usages.append({
+                    "id": usage.id,
+                    "material_id": usage.material_id,
+                    "job_id": usage.job_id,
+                    "quantity_used": usage.quantity_used,
+                    "wastage": usage.wastage,
+                    "remaining_stock": usage.material.stock_level,
+                    "created_at": usage.created_at.isoformat()
+                })
+
+            return jsonify({
+                "message": "Multiple material usages recorded successfully",
+                "usages": usages
+            }), 201
+
+        else:
+            schema = MaterialUsageCreateSchema()
+            usage = MaterialService.record_material_usage(schema.load(data))
+
+            return jsonify({
+                "message": "Material usage recorded successfully",
+                "usage": {
+                    "id": usage.id,
+                    "material_id": usage.material_id,
+                    "job_id": usage.job_id,
+                    "quantity_used": usage.quantity_used,
+                    "wastage": usage.wastage,
+                    "remaining_stock": usage.material.stock_level,
+                    "created_at": usage.created_at.isoformat()
+                }
+            }), 201
+
     except ValueError as e:
-        logger.error(e)
+        logger.error(f"Validation error: {e}")
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        logger.error(e)
+        logger.error(f"Internal server error: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -199,6 +228,17 @@ def restock_material():
             description: Material not found
           500:
             description: Internal server error
+
+        // POST json data
+        {
+           "material_id": 3,
+           "new_stock_level": 275.0,
+           "user_id": 28,
+           "adjustment_reason": "INVENTORY_COUNT",
+           "reference_number": "ADJ-2025-003",
+           "notes": "Monthly inventory audit - stock level updated based on physical count"
+        }
+
     """
     schema = MaterialRestockSchema()
     try:
