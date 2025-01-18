@@ -26,12 +26,18 @@ class MachineReadingCreateSchema(Schema):
     machine_id = fields.Int(required=True)
     start_meter = fields.Float(required=True)
     end_meter = fields.Float(required=True)
-    operator_id = fields.Int(allow_none=True)
+    operator_id = fields.Int(required=False, allow_none=True)
 
     @validates('end_meter')
-    def validate_end_meter(self, value):
-        if 'start_meter' in self.data and value < self.data['start_meter']:
+    def validate_end_meter(self, value, **kwargs):
+        """Validate end_meter is greater than start_meter"""
+        start_meter = self.context.get('start_meter')
+        if start_meter is not None and value < start_meter:
             raise ValidationError("End meter reading must be greater than start meter reading")
+
+    # class Meta:
+    #     """Meta class for additional options"""
+    #     unknown = EXCLUDE  # Ignore unknown fields
 
 
 class MachineReadingSchema(Schema):

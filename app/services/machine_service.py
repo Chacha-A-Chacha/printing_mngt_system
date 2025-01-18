@@ -138,3 +138,29 @@ class MachineReadingService:
             raise ValueError(f"Reading with ID {reading_id} not found")
 
         reading.delete()
+
+    @staticmethod
+    def list_readings(page=1, per_page=10):
+        """
+        Get a paginated list of all machine readings
+
+        Args:
+            page: Page number (default: 1)
+            per_page: Items per page (default: 10)
+
+        Returns:
+            Pagination object containing the readings
+        """
+        try:
+            pagination = MachineReading.query \
+                .join(Machine) \
+                .order_by(MachineReading.created_at.desc()) \
+                .paginate(
+                page=page,
+                per_page=per_page,
+                error_out=False
+            )
+            return pagination
+        except Exception as e:
+            logger.error(f"Error listing readings: {str(e)}")
+            raise ValueError("Failed to fetch machine readings")

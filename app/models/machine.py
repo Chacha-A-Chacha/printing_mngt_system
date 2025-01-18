@@ -1,4 +1,3 @@
-
 from . import BaseModel
 from sqlalchemy import Column, Integer, Float, ForeignKey, String
 from sqlalchemy.orm import relationship
@@ -18,6 +17,21 @@ class Machine(BaseModel):
 
     def get_latest_reading(self):
         return self.readings.order_by(MachineReading.created_at.desc()).first()
+
+    def serialize(self):
+        """Convert object to dictionary for API responses"""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "model": self.model,
+            "serial_number": self.serial_number,
+            "status": self.status,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat()
+        }
+
+    def __repr__(self):
+        return f"<Machine {self.id}>"
 
 
 class MachineReading(BaseModel):
@@ -42,6 +56,20 @@ class MachineReading(BaseModel):
     def calculate_meter_difference(self):
         """Calculate the difference between end and start meter readings"""
         return self.end_meter - self.start_meter
+
+    def serialize(self):
+        """Convert object to dictionary for API responses"""
+        return {
+            "id": self.id,
+            "job_id": self.job_id,
+            "machine_id": self.machine_id,
+            "start_meter": self.start_meter,
+            "end_meter": self.end_meter,
+            "meter_difference": self.calculate_meter_difference(),
+            "operator_id": self.operator_id,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat()
+        }
 
     def __repr__(self):
         return f"<MachineReading Machine {self.machine_id} Job {self.job_id}>"

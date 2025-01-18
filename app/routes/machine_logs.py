@@ -3,7 +3,7 @@ from flask import request, jsonify
 
 from . import machine_logs_bp
 from .. import logger
-from ..models.machine import Machine
+from ..models.machine import Machine, MachineReading
 from ..schemas.machine_schema import MachineCreateSchema, MachineReadingCreateSchema
 from ..services.machine_service import MachineService, MachineReadingService
 
@@ -211,4 +211,130 @@ def get_machine_readings(machine_id):
         return jsonify({"error": str(e)}), 404
     except Exception as e:
         logger.error(e)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@machine_logs_bp.route("/readings/list", methods=["GET"])
+def list_machine_readings():
+    """
+    Get paginated list of all machine readings
+    ---
+    tags:
+      - Machine Readings
+    parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 10
+    responses:
+      200:
+        description: List of machine readings retrieved successfully
+      500:
+        description: Internal server error
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+
+        # Get paginated readings with machines joined
+        pagination = MachineReading.query\
+            .join(Machine)\
+            .order_by(MachineReading.created_at.desc())\
+            .paginate(
+                page=page,
+                per_page=per_page,
+                error_out=False
+            )
+
+        readings = pagination.items
+
+        return jsonify({
+            "readings": [{
+                "id": reading.id,
+                "machine_id": reading.machine_id,
+                "machine_name": f"{reading.machine.name} - {reading.machine.model}",
+                "job_id": reading.job_id,
+                "start_meter": reading.start_meter,
+                "end_meter": reading.end_meter,
+                "operator_id": reading.operator_id,
+                "operator_name": reading.operator.name if reading.operator else None,
+                "created_at": reading.created_at.isoformat(),
+            } for reading in readings],
+            "pagination": {
+                "current_page": page,
+                "total_pages": pagination.pages,
+                "total_items": pagination.total,
+                "items_per_page": per_page
+            }
+        }), 200
+    except Exception as e:
+        logger.error(e)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@machine_logs_bp.route("/readings/list", methods=["GET"])
+def list_readings():
+    """
+    Get paginated list of all machine readings
+    ---
+    tags:
+      - Machine Readings
+    parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 10
+    responses:
+      200:
+        description: List of machine readings retrieved successfully
+      500:
+        description: Internal server error
+    """
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+
+        # Get paginated readings with machines joined
+        pagination = MachineReading.query\
+            .join(Machine)\
+            .order_by(MachineReading.created_at.desc())\
+            .paginate(
+                page=page,
+                per_page=per_page,
+                error_out=False
+            )
+
+        readings = pagination.items
+
+        return jsonify({
+            "readings": [{
+                **reading.serialize(),
+                "machine_name": f"{reading.machine.name} - {reading.machine.model}",
+                "operator_name": reading.operator.name if reading.operator else None
+            } for reading in readings],
+            "pagination": {
+                "current_page": page,
+                "total_pages": pagination.pages,
+                "total_items": pagination.total,
+                "items_per_page": per_page
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Error listing machine readings: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
